@@ -1,0 +1,34 @@
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build & Dependencies
+node_modules/
+bin/
+obj/
+dist/
+publish/
+.next/
+out/
+
+# Environment & Secrets
+.env
+.env.local
+.env.*.local
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Database
+*.db
+*.sqlite
+
+# Docker
+.dockerignore
