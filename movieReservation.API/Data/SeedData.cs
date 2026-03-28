@@ -318,6 +318,28 @@ public static class SeedData
     <div style='background: #0f0f23; padding: 16px; text-align: center; font-size: 12px; color: #666;'>
         © 2026 Movie Reservation System
     </div>
+</div>",
+            StaffInviteEmailSubject = "🎬 Welcome to the Cinemax Team!",
+            StaffInviteEmailTemplate = @"
+<div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #1a1a2e; color: #e0e0e0; border-radius: 12px; overflow: hidden;'>
+    <div style='background: linear-gradient(135deg, #f59e0b, #d97706); padding: 32px; text-align: center;'>
+        <h1 style='color: white; margin: 0; font-size: 24px;'>🛡️ New Role Assignment</h1>
+    </div>
+    <div style='padding: 32px;'>
+        <p style='font-size: 16px;'>Hello <strong>{{name}}</strong>,</p>
+        <p>You have been assigned the <strong>{{role}}</strong> role in the Movie Reservation System. This gives you access to specific administrative modules.</p>
+        <div style='background: #16213e; border-radius: 8px; padding: 20px; margin: 20px 0; border-left: 4px solid #f59e0b;'>
+            <p style='margin: 4px 0;'><strong>Username:</strong> {{email}}</p>
+            <p style='margin: 4px 0;'><strong>Temporary Password:</strong> {{password}}</p>
+        </div>
+        <p style='font-size: 14px; color: #888; border-top: 1px solid #ffffff10; padding-top: 16px;'>As a <strong>{{role}}</strong>, you can now manage specific aspects of the platform based on your permissions.</p>
+        <div style='text-align: center; margin-top: 24px;'>
+            <a href='http://localhost:5173/admin' style='display: inline-block; background: #f59e0b; color: white; padding: 12px 32px; border-radius: 8px; text-decoration: none; font-weight: bold;'>Go to Dashboard</a>
+        </div>
+    </div>
+    <div style='background: #0f0f23; padding: 16px; text-align: center; font-size: 12px; color: #666;'>
+        © 2026 Movie Reservation System
+    </div>
 </div>"
         });
 

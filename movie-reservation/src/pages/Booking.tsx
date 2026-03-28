@@ -36,6 +36,7 @@ export function Booking() {
   
   const [seats, setSeats] = useState<Seat[]>([]);
   const [selectedSeats, setSelectedSeats] = useState<Seat[]>([]);
+  const [occupiedSeats, setOccupiedSeats] = useState<string[]>([]);
   
   const [bookingId, setBookingId] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
@@ -46,21 +47,26 @@ export function Booking() {
 
   const now = new Date();
 
-  const bookedSeats = useMemo(() => {
-    if (!selectedShowtime || !selectedDate || !selectedCinema) return new Set<string>();
-    
-    const relevantTickets = tickets.filter(t => 
-       t.movieId === movie?.id &&
-       t.cinemaId === selectedCinema &&
-       t.status !== 'cancelled' &&
-       format(new Date(t.bookingDate), 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd') &&
-       (t.showtime === selectedShowtime.time || t.showtimeId === selectedShowtime.id)
-    );
-    
-    const seatSet = new Set<string>();
-    relevantTickets.forEach(t => t.seats?.forEach(s => seatSet.add(s.trim())));
-    return seatSet;
-  }, [tickets, movie?.id, selectedCinema, selectedDate, selectedShowtime]);
+  // Fetch occupied seats from API when showtime is selected
+  useEffect(() => {
+    if (selectedShowtime && selectedCinema && selectedDate) {
+      const fetchOccupied = async () => {
+        try {
+          const cinema = cinemas.find(c => c.id === selectedCinema);
+          const dateStr = format(selectedDate, 'yyyy-MM-dd');
+          const res = await api.get<string[]>(`/bookings/occupied-seats?movieTitle=${encodeURIComponent(movie.title)}&cinemaName=${encodeURIComponent(cinema?.name || '')}&showtime=${selectedShowtime.time}&screen=${selectedShowtime.screen}&date=${dateStr}`);
+          setOccupiedSeats(res);
+        } catch (e) {
+          console.error('Failed to fetch occupied seats', e);
+        }
+      };
+      fetchOccupied();
+    } else {
+      setOccupiedSeats([]);
+    }
+  }, [selectedShowtime, selectedCinema, selectedDate, movie.title]);
+
+  const bookedSeats = useMemo(() => new Set(occupiedSeats), [occupiedSeats]);
 
   // Auto-select showtime from URL params
   useEffect(() => {
@@ -132,6 +138,10 @@ export function Booking() {
         '/bookings',
         payload
       );
+      
+      // Clear selections and refresh local occupied seats to show "Blocked" status immediately
+      setOccupiedSeats(prev => [...prev, ...selectedSeats.map(s => s.id)]);
+      setSelectedSeats([]);
       
       // Refresh the tickets in global state so MyTickets page is up to date
       await refreshTickets();

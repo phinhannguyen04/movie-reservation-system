@@ -115,4 +115,43 @@ public class EmailService
 
         await SendEmailAsync(email, customerName, subject, html);
     }
+
+    public async Task SendStaffInviteEmail(string email, string name, string role, string temporaryPassword)
+    {
+        var settings = await GetSettings();
+        var subject = settings?.StaffInviteEmailSubject ?? "Cinemax: You've been invited as Staff!";
+        var html = settings?.StaffInviteEmailTemplate ?? "";
+
+        if (string.IsNullOrEmpty(html))
+        {
+            // Fallback with fixed placeholders
+            html = @"
+<div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #0a0a0a; color: #e0e0e0; border-radius: 12px; overflow: hidden; border: 1px solid #222;'>
+    <div style='background: linear-gradient(135deg, #e50914, #b20710); padding: 32px; text-align: center;'>
+        <h1 style='color: white; margin: 0; font-size: 26px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase;'>STAFF INVITATION</h1>
+    </div>
+    <div style='padding: 32px;'>
+        <p style='font-size: 16px; color: #ffffff;'>Dear <strong>{{name}}</strong>,</p>
+        <p style='color: #a3a3a3; line-height: 1.5;'>You have been added to the Cinemax system as a staff member by the administrator.</p>
+        <div style='background: #141414; border-radius: 8px; padding: 20px; margin: 24px 0; border-left: 4px solid #e50914; box-shadow: 0 4px 15px rgba(0,0,0,0.5);'>
+            <p style='margin: 8px 0; font-size: 15px;'><strong>System Role:</strong> <span style='color: #e50914; font-weight: bold; text-transform: uppercase;'>{{role}}</span></p>
+            <p style='margin: 8px 0; font-size: 15px;'><strong>Login Email:</strong> <span style='color: #ffffff;'>{{email}}</span></p>
+            <p style='margin: 8px 0; font-size: 15px;'><strong>Temporary Password:</strong> <span style='color: #ffffff; font-family: monospace;'>{{password}}</span></p>
+        </div>
+        <p style='color: #f59e0b; font-size: 13px;'>⚠️ For security reasons, please change your password immediately after logging in for the first time.</p>
+        <div style='text-align: center; margin-top: 32px; margin-bottom: 16px;'>
+            <a href='http://localhost:5173/admin' style='display: inline-block; background: #e50914; color: white; padding: 14px 36px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 16px; letter-spacing: 0.5px; box-shadow: 0 4px 12px rgba(229, 9, 20, 0.4);'>ACCESS ADMIN PANEL</a>
+        </div>
+    </div>
+    <div style='background: #050505; border-top: 1px solid #1a1a1a; padding: 20px; text-align: center; font-size: 12px; color: #666;'>© 2026 Cinemax Reservation System. <br/>Internal Staff Communication.</div>
+</div>";
+        }
+
+        html = html.Replace("{{name}}", name)
+                   .Replace("{{email}}", email)
+                   .Replace("{{role}}", role)
+                   .Replace("{{password}}", temporaryPassword);
+
+        await SendEmailAsync(email, name, subject, html);
+    }
 }
