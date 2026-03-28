@@ -2,11 +2,12 @@ import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { Play, Star, Clock, Calendar, Ticket } from 'lucide-react';
-import { movies } from '@/data/mock';
+import { useData } from '@/contexts/DataContext';
 import { TrailerModal } from '@/components/ui/TrailerModal';
 
 export function MovieDetails() {
   const { id } = useParams();
+  const { movies } = useData();
   const movie = movies.find(m => m.id === id);
   const [isTrailerOpen, setIsTrailerOpen] = useState(false);
 

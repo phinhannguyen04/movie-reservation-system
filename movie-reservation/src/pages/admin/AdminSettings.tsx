@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Settings, Bookmark, CheckCircle, AlertCircle, Info, X, Shield, Globe, HardDrive } from 'lucide-react';
-import { AdminHeader } from '@/components/admin/ui/AdminHeader';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { motion } from 'motion/react';
 import { cn } from '@/lib/utils';
 
@@ -54,8 +54,8 @@ export function AdminSettings() {
   const labelClass = "block text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] mb-3 ml-1";
 
   return (
-    <div className="max-w-7xl mx-auto space-y-12 h-full pb-20 pt-4">
-      <AdminHeader 
+    <div className="space-y-12 h-full pb-20 pt-4">
+      <PageHeader 
         title="System Configuration"
         description="Fine-tune high-level variables, security logic, and architectural parameters for the entire network."
         category="Global Protocol"

@@ -93,39 +93,39 @@ export function DataTable<T extends { id: string | number }>({
   }, [searchQuery, data.length]);
 
   return (
-    <div className="bg-surface/50 backdrop-blur-md rounded-2xl border border-white/10 flex flex-col h-full shadow-2xl shadow-black/40 group/table transition-all duration-500">
+    <div className="bg-surface/40 backdrop-blur-xl rounded-[32px] border border-white/10 flex flex-col h-full shadow-[0_40px_100px_rgba(0,0,0,0.5)] group/table transition-all duration-700 overflow-hidden">
       {/* Table Header */}
-      <div className="p-6 border-b border-white/5 bg-gradient-to-br from-white/[0.02] to-transparent">
-        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6">
-          <div className="space-y-1">
-            {title && <h2 className="text-2xl font-display font-bold text-white tracking-tight">{title}</h2>}
-            {description && <p className="text-sm text-gray-500 font-medium">{description}</p>}
+      <div className="px-8 py-10 border-b border-white/5 bg-gradient-to-br from-white/[0.03] via-transparent to-transparent">
+        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-8">
+          <div className="space-y-2">
+            {title && <h2 className="text-3xl font-display font-black text-white tracking-tighter uppercase leading-none">{title}</h2>}
+            {description && <p className="text-sm text-gray-500 font-medium max-w-xl">{description}</p>}
           </div>
           
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Search Bar - Modernized */}
-            <div className="relative group/search flex-1 min-w-[300px]">
-              <div className="absolute inset-0 bg-primary/5 rounded-xl blur-lg group-focus-within/search:bg-primary/10 transition-all opacity-0 group-focus-within/search:opacity-100" />
-              <Search className="w-4 h-4 text-gray-500 absolute left-4 top-1/2 -translate-y-1/2 group-focus-within/search:text-primary transition-colors" />
+          <div className="flex flex-wrap items-center gap-4">
+            {/* Search Bar - High Fidelity */}
+            <div className="relative group/search flex-1 min-w-[320px]">
+              <div className="absolute inset-0 bg-primary/10 rounded-2xl blur-xl group-focus-within/search:bg-primary/20 transition-all opacity-0 group-focus-within/search:opacity-100" />
+              <Search className="w-5 h-5 text-gray-500 absolute left-5 top-1/2 -translate-y-1/2 group-focus-within/search:text-primary transition-colors" />
               <input 
                 type="text" 
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder={searchPlaceholder}
-                className="relative w-full pl-11 pr-4 py-3 bg-black/20 border border-white/10 rounded-xl text-sm text-white placeholder-gray-600 focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all"
+                className="relative w-full pl-14 pr-6 py-4 bg-black/40 border border-white/10 rounded-2xl text-sm font-bold text-white placeholder-gray-700 focus:outline-none focus:border-primary/50 focus:ring-4 focus:ring-primary/5 transition-all"
               />
             </div>
 
             {/* Actions & Filters */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               {onFilterClick && (
                 <button 
                   onClick={onFilterClick}
                   className={cn(
-                    "flex items-center gap-2 px-4 py-3 rounded-xl border font-bold text-sm transition-all active:scale-95",
+                    "flex items-center gap-2.5 px-6 py-4 rounded-2xl border text-[10px] font-black uppercase tracking-[0.2em] transition-all active:scale-95",
                     filterButtonActive 
-                      ? "bg-primary text-white border-primary shadow-lg shadow-primary/20" 
-                      : "bg-white/5 border-white/10 text-gray-400 hover:text-white hover:border-white/20"
+                      ? "bg-primary text-white border-primary shadow-[0_10px_40px_rgba(255,51,0,0.3)]" 
+                      : "bg-white/5 border-white/10 text-gray-400 hover:text-white hover:bg-white/10"
                   )}
                 >
                   <Filter className="w-4 h-4" />
@@ -135,12 +135,12 @@ export function DataTable<T extends { id: string | number }>({
               
               {customFilters && <div className="contents">{customFilters}</div>}
               
-              <div className="h-8 w-[1px] bg-white/10 mx-1 hidden sm:block" />
+              <div className="h-10 w-[1px] bg-white/10 mx-2 hidden sm:block" />
 
               {onAdd && (
                 <button 
                   onClick={onAdd}
-                  className="px-6 py-3 bg-white text-black hover:bg-white/90 text-sm font-black rounded-xl transition-all shadow-xl shadow-white/5 active:scale-95 whitespace-nowrap uppercase tracking-wider"
+                  className="px-8 py-4 bg-white text-black hover:bg-white/90 text-[10px] font-black rounded-2xl transition-all shadow-2xl shadow-white/5 active:scale-95 whitespace-nowrap uppercase tracking-[0.2em]"
                 >
                   {addLabel}
                 </button>

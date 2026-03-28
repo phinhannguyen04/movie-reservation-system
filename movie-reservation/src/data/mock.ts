@@ -329,38 +329,40 @@ export const generateShowtimes = (movieId: string, date: string): Showtime[] => 
   ];
 };
 
-// Helper to generate seats
-export const generateSeats = (): Seat[] => {
+// Helper to generate seats based on room capacity
+export const generateSeats = (capacity: number = 140): Seat[] => {
   const seats: Seat[] = [];
-  const rows = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'];
-  const cols = 14;
+  // Calculate layout based on capacity (aim for ~10-12 columns)
+  const cols = capacity > 100 ? 12 : 10;
+  const numRows = Math.ceil(capacity / cols);
 
-  rows.forEach((row, rIndex) => {
+  for (let rIndex = 0; rIndex < numRows; rIndex++) {
+    const row = String.fromCharCode(65 + rIndex);
     for (let col = 1; col <= cols; col++) {
+      if (seats.length >= capacity) break;
+
       let type: 'normal' | 'vip' | 'couple' = 'normal';
       let price = 10;
 
-      if (rIndex >= 4 && rIndex <= 7 && col >= 4 && col <= 11) {
+      // Logic for seat types based on row position
+      if (rIndex >= Math.floor(numRows / 3) && rIndex <= Math.floor(numRows * 2 / 3)) {
         type = 'vip';
         price = 15;
-      } else if (rIndex === 9) {
+      } else if (rIndex === numRows - 1) {
         type = 'couple';
-        price = 25; // price for two
+        price = 25;
       }
-
-      // We no longer randomly occupy seats; status will be determined by live booking data
-      const isOccupied = false;
 
       seats.push({
         id: `${row}${col}`,
         row,
         col,
         type,
-        status: isOccupied ? 'occupied' : 'available',
+        status: 'available',
         price,
       });
     }
-  });
+  }
 
   return seats;
 };

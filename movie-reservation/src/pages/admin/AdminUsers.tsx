@@ -1,15 +1,16 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { DataTable } from '@/components/admin/ui/DataTable';
 import { Modal } from '@/components/admin/ui/Modal';
 import { AdvancedFilterModal, FilterConfig } from '@/components/admin/ui/AdvancedFilterModal';
 import { useAuth } from '@/contexts/AuthContext';
-import { useData, User } from '@/contexts/DataContext';
-import { Search, User as UserIcon, Shield, Lock, CheckCircle, AlertCircle, LayoutGrid } from 'lucide-react';
-import { AdminHeader } from '@/components/admin/ui/AdminHeader';
-import { motion, AnimatePresence } from 'motion/react';
-import { cn } from '@/lib/utils';
+import { Search, Shield, Lock, CheckCircle, AlertCircle, LayoutGrid, Users, Check, X, UserPlus, Eye, Trash2, ArrowRight, Plus } from 'lucide-react';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { api } from '@/services/api';
+import { useData, User, Staff } from '@/contexts/DataContext';
 import { useDataTable } from '@/hooks/useDataTable';
 import { UserAvatar } from '@/components/ui/UserAvatar';
+import { motion, AnimatePresence } from 'motion/react';
+import { cn } from '@/lib/utils';
 
 export function AdminUsers() {
   const { user: authUser } = useAuth();
@@ -156,11 +157,11 @@ export function AdminUsers() {
 
   return (
     <div className="h-full relative flex flex-col gap-8">
-      <AdminHeader 
-        title="Identity Directory"
-        description="Monitor and manage the global user registry. Audit access levels and account security statuses."
-        category="Identity Management"
-        icon={UserIcon}
+      <PageHeader 
+        title="User Registry"
+        description="Monitor system-wide identity protocols, manage customer segments, and audit account security."
+        category="Identity Hub"
+        icon={Users}
       />
 
       <div className="flex-1 min-h-0">
