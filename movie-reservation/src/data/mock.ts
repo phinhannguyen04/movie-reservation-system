@@ -53,11 +53,18 @@ export interface Booking {
   movieId: string;
   cinemaId: string;
   showtimeId: string;
+  userId?: string;
   seats: string[];
   totalPrice: number;
   bookingDate: string;
-  status: 'confirmed' | 'cancelled' | 'watched';
+  status: 'pending' | 'confirmed' | 'cancelled' | 'watched';
+  // Denormalised fields from API
+  movieTitle?: string;
+  cinemaName?: string;
+  showtime?: string;
+  screen?: string;
 }
+
 
 export const movies: Movie[] = [
   {
@@ -340,8 +347,8 @@ export const generateSeats = (): Seat[] => {
         price = 25; // price for two
       }
 
-      // Randomly occupy some seats
-      const isOccupied = Math.random() < 0.3;
+      // We no longer randomly occupy seats; status will be determined by live booking data
+      const isOccupied = false;
 
       seats.push({
         id: `${row}${col}`,

@@ -24,6 +24,8 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<Movie>(e =>
         {
             e.HasIndex(m => m.Title);
+            e.HasIndex(m => m.ReleaseDate);
+            e.HasIndex(m => m.Rating);
             e.Property(m => m.Genre).HasColumnType("text[]");
             e.Property(m => m.Cast).HasColumnType("text[]");
         });
@@ -46,11 +48,19 @@ public class AppDbContext : DbContext
             .WithMany(c => c.Showtimes)
             .HasForeignKey(s => s.CinemaId);
 
+        modelBuilder.Entity<Showtime>()
+            .HasIndex(s => new { s.MovieId, s.Date });
+
         // ── Booking → Movie, Cinema, Showtime, User ──────
         modelBuilder.Entity<Booking>(e =>
         {
             e.Property(b => b.Seats).HasColumnType("text[]");
             e.Property(b => b.TotalPrice).HasColumnType("decimal(10,2)");
+            
+            // Scalability Indices
+            e.HasIndex(b => b.UserId);
+            e.HasIndex(b => b.BookingDate);
+            e.HasIndex(b => new { b.MovieTitle, b.CinemaName, b.Showtime, b.Screen, b.BookingDate });
         });
 
         // ── User unique email ─────────────────────────────

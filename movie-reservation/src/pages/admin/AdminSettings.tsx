@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Bookmark, User, Mail, Loader2, Save, Send } from 'lucide-react';
+import { Settings, Bookmark, User, Mail, Loader2, Save, Send, Eye, EyeOff, CheckCircle, AlertCircle, Info, X } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/lib/utils';
 import { api } from '@/services/api';
 
@@ -12,10 +13,60 @@ const tabs = [
   { id: 'email', label: 'Email Configuration', icon: Mail },
 ] as const;
 
+type ToastType = 'success' | 'error' | 'info';
+interface Toast { type: ToastType; message: string }
+
+function InlineToast({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }) {
+  const styles = {
+    success: { bg: 'bg-green-500/10 border-green-500/20 text-green-400', Icon: CheckCircle },
+    error:   { bg: 'bg-red-500/10 border-red-500/20 text-red-400',       Icon: AlertCircle },
+    info:    { bg: 'bg-blue-500/10 border-blue-500/20 text-blue-400',    Icon: Info },
+  };
+  const { bg, Icon } = styles[toast.type];
+  return (
+    <div className={cn('flex items-start gap-3 p-4 rounded-xl border text-sm mb-4', bg)}>
+      <Icon className="w-5 h-5 shrink-0 mt-0.5" />
+      <span className="flex-1">{toast.message}</span>
+      <button onClick={onDismiss} className="text-inherit opacity-60 hover:opacity-100 text-lg leading-none">&times;</button>
+    </div>
+  );
+}
+
 export function AdminSettings() {
   const [activeTab, setActiveTab] = useState<TabId>('general');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [toast, setToast] = useState<Toast | null>(null);
+  const [showSmtpPassword, setShowSmtpPassword] = useState(false);
+  const [testEmailAddress, setTestEmailAddress] = useState('');
+  const [previewTemplate, setPreviewTemplate] = useState<{ html: string; type: 'welcome' | 'booking' } | null>(null);
+
+  const showToast = (type: ToastType, message: string) => {
+    setToast({ type, message });
+    setTimeout(() => setToast(null), 5000);
+  };
+
+  const getCompiledTemplate = (html: string, type: 'welcome' | 'booking') => {
+    let result = html || '';
+    if (type === 'welcome') {
+      result = result
+        .replace(/{{name}}/g, 'John Doe')
+        .replace(/{{email}}/g, 'john.doe@example.com')
+        .replace(/{{password}}/g, '********');
+    } else {
+      result = result
+        .replace(/{{customerName}}/g, 'John Doe')
+        .replace(/{{movieTitle}}/g, 'Dune: Part Two')
+        .replace(/{{cinemaName}}/g, 'Cinemax IMAX')
+        .replace(/{{screen}}/g, 'Screen 1')
+        .replace(/{{date}}/g, '2026-10-24')
+        .replace(/{{time}}/g, '19:00')
+        .replace(/{{seats}}/g, 'G6, G7')
+        .replace(/{{totalPrice}}/g, '30.00')
+        .replace(/{{bookingId}}/g, 'B-AX91023D');
+    }
+    return result;
+  };
 
   // Email Configuration State
   const [smtp, setSmtp] = useState({
@@ -26,10 +77,13 @@ export function AdminSettings() {
     fromEmail: '',
     fromName: '',
     enableSsl: true,
-    emailEnabled: false
+    emailEnabled: false,
+    welcomeEmailSubject: '',
+    welcomeEmailTemplate: '',
+    bookingEmailSubject: '',
+    bookingEmailTemplate: '',
   });
 
-  // Fetch settings on mount
   useEffect(() => {
     if (activeTab === 'email') {
       loadEmailSettings();
@@ -41,10 +95,10 @@ export function AdminSettings() {
     try {
       const data = await api.get<any>('/settings/email');
       if (data.configured) {
-        setSmtp(data);
+        setSmtp(prev => ({ ...prev, ...data }));
       }
     } catch (err) {
-      console.error('Failed to load email settings', err);
+      showToast('error', 'Failed to load email settings. Check the API connection.');
     } finally {
       setLoading(false);
     }
@@ -54,28 +108,32 @@ export function AdminSettings() {
     setSaving(true);
     try {
       await api.put('/settings/email', smtp);
-      alert('Email settings saved successfully!');
+      showToast('success', 'Email settings saved successfully!');
     } catch (err) {
-      alert('Failed to save settings');
+      showToast('error', 'Failed to save settings. Please check your inputs and try again.');
     } finally {
       setSaving(false);
     }
   };
 
   const handleTestEmail = async () => {
-    const email = prompt('Enter recipient email for test:');
-    if (!email) return;
-
+    if (!testEmailAddress.trim()) {
+      showToast('error', 'Please enter a recipient email address before sending a test.');
+      return;
+    }
     setSaving(true);
     try {
-      await api.post('/settings/email/test', { email });
-      alert('Test email sent! Check your inbox.');
+      await api.post('/settings/email/test', { email: testEmailAddress.trim() });
+      showToast('success', `Test email sent to ${testEmailAddress}! Check your inbox (and spam folder).`);
     } catch (err) {
-      alert('Failed to send test email. Check console or SMTP logs.');
+      showToast('error', 'Failed to send test email. Verify your SMTP credentials and that email is Enabled.');
     } finally {
       setSaving(false);
     }
   };
+
+  const fieldClass = "w-full bg-background border border-white/10 rounded-lg px-4 py-2.5 text-white focus:border-primary focus:outline-none transition-colors placeholder:text-gray-600";
+  const labelClass = "block text-sm font-medium text-gray-300 mb-2";
 
   return (
     <div className="max-w-5xl mx-auto space-y-8 h-full pb-12">
@@ -97,7 +155,7 @@ export function AdminSettings() {
                 className={cn(
                   "w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors text-left",
                   isActive 
-                    ? "bg-primary/10 text-primary" 
+                    ? "bg-primary/10 text-primary border border-primary/20" 
                     : "text-gray-400 hover:text-white hover:bg-white/5"
                 )}
               >
@@ -115,12 +173,12 @@ export function AdminSettings() {
               <h2 className="text-xl font-bold mb-6">General System Settings</h2>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">System Name</label>
-                  <input type="text" defaultValue="Cinemax Official" className="w-full bg-background border border-white/10 rounded-lg px-4 py-2.5 text-white focus:border-primary focus:outline-none transition-colors" />
+                  <label className={labelClass}>System Name</label>
+                  <input type="text" defaultValue="Cinemax Official" className={fieldClass} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Support Email</label>
-                  <input type="email" defaultValue="support@cinemax.example.com" className="w-full bg-background border border-white/10 rounded-lg px-4 py-2.5 text-white focus:border-primary focus:outline-none transition-colors" />
+                  <label className={labelClass}>Support Email</label>
+                  <input type="email" defaultValue="support@cinemax.example.com" className={fieldClass} />
                 </div>
                 <div className="pt-4">
                   <button className="px-6 py-2.5 bg-primary hover:bg-primary-hover text-white rounded-lg font-medium transition-colors shadow-lg shadow-primary/20">
@@ -136,12 +194,12 @@ export function AdminSettings() {
               <h2 className="text-xl font-bold mb-6">Booking Rules</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Max Tickets Per Booking</label>
-                  <input type="number" defaultValue="8" className="w-full bg-background border border-white/10 rounded-lg px-4 py-2.5 text-white focus:border-primary focus:outline-none transition-colors" />
+                  <label className={labelClass}>Max Tickets Per Booking</label>
+                  <input type="number" defaultValue="8" className={fieldClass} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Seat Hold Timeout (mins)</label>
-                  <input type="number" defaultValue="10" className="w-full bg-background border border-white/10 rounded-lg px-4 py-2.5 text-white focus:border-primary focus:outline-none transition-colors" />
+                  <label className={labelClass}>Seat Hold Timeout (mins)</label>
+                  <input type="number" defaultValue="10" className={fieldClass} />
                 </div>
                 <div className="md:col-span-2 pt-4">
                   <button className="px-6 py-2.5 bg-primary hover:bg-primary-hover text-white rounded-lg font-medium transition-colors shadow-lg shadow-primary/20">
@@ -171,10 +229,16 @@ export function AdminSettings() {
 
           {activeTab === 'email' && (
             <div className="space-y-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold">Email SMTP Configuration</h2>
+              {/* Header */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-bold">Email SMTP Configuration</h2>
+                  <p className="text-sm text-gray-400 mt-1">Configure the mail server used to send welcome and booking emails.</p>
+                </div>
                 <div className="flex items-center gap-3">
-                  <span className="text-sm text-gray-400">Status: {smtp.emailEnabled ? '✅ Enabled' : '❌ Disabled'}</span>
+                  <span className={cn("text-xs font-medium px-2 py-1 rounded-full", smtp.emailEnabled ? "bg-green-500/10 text-green-400 border border-green-500/20" : "bg-white/5 text-gray-400 border border-white/10")}>
+                    {smtp.emailEnabled ? 'Active' : 'Inactive'}
+                  </span>
                   <button 
                     onClick={() => setSmtp({...smtp, emailEnabled: !smtp.emailEnabled})}
                     className={cn(
@@ -183,164 +247,226 @@ export function AdminSettings() {
                     )}
                   >
                     <div className={cn(
-                      "absolute top-1 w-4 h-4 bg-white rounded-full transition-all",
+                      "absolute top-1 w-4 h-4 bg-white rounded-full transition-all shadow",
                       smtp.emailEnabled ? "right-1" : "left-1"
                     )}></div>
                   </button>
                 </div>
               </div>
 
+              {/* Inline Toast */}
+              {toast && <InlineToast toast={toast} onDismiss={() => setToast(null)} />}
+
               {loading ? (
                 <div className="flex items-center justify-center py-12">
                   <Loader2 className="w-8 h-8 animate-spin text-primary" />
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-300 mb-2">SMTP Host</label>
-                    <input 
-                      type="text" 
-                      value={smtp.smtpHost} 
-                      onChange={e => setSmtp({...smtp, smtpHost: e.target.value})}
-                      placeholder="e.g. smtp.gmail.com"
-                      className="w-full bg-background border border-white/10 rounded-lg px-4 py-2.5 text-white focus:border-primary focus:outline-none transition-colors" 
-                    />
-                  </div>
+                <div className="space-y-8">
+                  {/* SMTP Server Settings */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">SMTP Port</label>
-                    <input 
-                      type="number" 
-                      value={smtp.smtpPort} 
-                      onChange={e => setSmtp({...smtp, smtpPort: parseInt(e.target.value) || 0})}
-                      className="w-full bg-background border border-white/10 rounded-lg px-4 py-2.5 text-white focus:border-primary focus:outline-none transition-colors" 
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">SSL / TLS</label>
-                    <div className="flex items-center gap-4 mt-2">
-                       <label className="flex items-center gap-2 cursor-pointer">
-                          <input type="checkbox" checked={smtp.enableSsl} onChange={e => setSmtp({...smtp, enableSsl: e.target.checked})} className="w-5 h-5 rounded border-white/10 bg-background text-primary" />
-                          <span className="text-sm text-gray-300">Enable SSL/TLS</span>
-                       </label>
+                    <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">Server Settings</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="md:col-span-2">
+                        <label className={labelClass}>SMTP Host</label>
+                        <input 
+                          type="text" 
+                          value={smtp.smtpHost} 
+                          onChange={e => setSmtp({...smtp, smtpHost: e.target.value})}
+                          placeholder="smtp.gmail.com"
+                          className={fieldClass} 
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>SMTP Port</label>
+                        <input 
+                          type="number" 
+                          value={smtp.smtpPort} 
+                          onChange={e => setSmtp({...smtp, smtpPort: parseInt(e.target.value) || 0})}
+                          className={fieldClass} 
+                        />
+                      </div>
+                      <div className="flex items-end pb-1">
+                        <label className="flex items-center gap-3 cursor-pointer select-none">
+                          <div 
+                            onClick={() => setSmtp({...smtp, enableSsl: !smtp.enableSsl})}
+                            className={cn("w-10 h-5 rounded-full relative transition-colors cursor-pointer", smtp.enableSsl ? "bg-primary" : "bg-white/10")}
+                          >
+                            <div className={cn("absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all shadow", smtp.enableSsl ? "right-0.5" : "left-0.5")}></div>
+                          </div>
+                          <span className="text-sm text-gray-300">Enable SSL / TLS</span>
+                        </label>
+                      </div>
                     </div>
                   </div>
+
+                  {/* Auth Credentials */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">SMTP Username</label>
-                    <input 
-                      type="text" 
-                      value={smtp.smtpUsername} 
-                      onChange={e => setSmtp({...smtp, smtpUsername: e.target.value})}
-                      placeholder="your-email@gmail.com"
-                      className="w-full bg-background border border-white/10 rounded-lg px-4 py-2.5 text-white focus:border-primary focus:outline-none transition-colors" 
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">SMTP Password</label>
-                    <input 
-                      type="password" 
-                      value={smtp.smtpPassword} 
-                      onChange={e => setSmtp({...smtp, smtpPassword: e.target.value})}
-                      placeholder="••••••••"
-                      className="w-full bg-background border border-white/10 rounded-lg px-4 py-2.5 text-white focus:border-primary focus:outline-none transition-colors" 
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">From Email</label>
-                    <input 
-                      type="email" 
-                      value={smtp.fromEmail} 
-                      onChange={e => setSmtp({...smtp, fromEmail: e.target.value})}
-                      placeholder="noreply@yourdomain.com"
-                      className="w-full bg-background border border-white/10 rounded-lg px-4 py-2.5 text-white focus:border-primary focus:outline-none transition-colors" 
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">From Name</label>
-                    <input 
-                      type="text" 
-                      value={smtp.fromName} 
-                      onChange={e => setSmtp({...smtp, fromName: e.target.value})}
-                      placeholder="Movie Reservation"
-                      className="w-full bg-background border border-white/10 rounded-lg px-4 py-2.5 text-white focus:border-primary focus:outline-none transition-colors" 
-                    />
+                    <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">Authentication</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className={labelClass}>SMTP Username</label>
+                        <input 
+                          type="text" 
+                          value={smtp.smtpUsername} 
+                          onChange={e => setSmtp({...smtp, smtpUsername: e.target.value})}
+                          placeholder="your-email@gmail.com"
+                          className={fieldClass} 
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>SMTP Password</label>
+                        <div className="relative">
+                          <input 
+                            type={showSmtpPassword ? 'text' : 'password'}
+                            value={smtp.smtpPassword} 
+                            onChange={e => setSmtp({...smtp, smtpPassword: e.target.value})}
+                            placeholder="App password (16 chars)"
+                            className={cn(fieldClass, 'pr-10')} 
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowSmtpPassword(!showSmtpPassword)}
+                            className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-gray-300 transition-colors"
+                          >
+                            {showSmtpPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </button>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">For Gmail, use an App Password, not your regular password.</p>
+                      </div>
+                      <div>
+                        <label className={labelClass}>From Email</label>
+                        <input 
+                          type="email" 
+                          value={smtp.fromEmail} 
+                          onChange={e => setSmtp({...smtp, fromEmail: e.target.value})}
+                          placeholder="noreply@yourdomain.com"
+                          className={fieldClass} 
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>From Name</label>
+                        <input 
+                          type="text" 
+                          value={smtp.fromName} 
+                          onChange={e => setSmtp({...smtp, fromName: e.target.value})}
+                          placeholder="Cinemax"
+                          className={fieldClass} 
+                        />
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="md:col-span-2 pt-6 border-t border-white/5 space-y-8">
-                    {/* Welcome Email Template */}
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                        <Mail className="w-5 h-5 text-primary" />
-                        Welcome Email Template
-                      </h3>
-                      <div className="grid grid-cols-1 gap-4">
+                  {/* Email Templates */}
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">Email Templates</h3>
+                    <div className="space-y-6">
+                      {/* Welcome Email */}
+                      <div className="p-5 bg-background rounded-xl border border-white/10 space-y-3">
+                        <div className="flex items-center gap-2 mb-3">
+                          <div className="w-2 h-2 rounded-full bg-primary"></div>
+                          <h4 className="font-semibold text-white">Welcome Email</h4>
+                          <span className="text-xs text-gray-500 ml-auto">Sent on registration</span>
+                        </div>
                         <div>
-                          <label className="block text-sm font-medium text-gray-400 mb-1">Subject</label>
+                          <label className="block text-xs font-medium text-gray-400 mb-1">Subject</label>
                           <input 
                             type="text" 
-                            value={smtp.welcomeEmailSubject || ''} 
+                            value={smtp.welcomeEmailSubject} 
                             onChange={e => setSmtp({...smtp, welcomeEmailSubject: e.target.value})}
-                            className="w-full bg-background border border-white/10 rounded-lg px-4 py-2.5 text-white focus:border-primary focus:outline-none" 
+                            className={fieldClass} 
                           />
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-gray-400 mb-1">HTML Template</label>
+                          <div className="flex justify-between items-end mb-1">
+                            <label className="block text-xs font-medium text-gray-400">HTML Template</label>
+                            <button 
+                              onClick={() => setPreviewTemplate({ html: smtp.welcomeEmailTemplate, type: 'welcome' })}
+                              className="text-[10px] uppercase font-bold tracking-wider text-primary hover:text-primary-hover transition-colors flex items-center gap-1"
+                            >
+                              <Eye className="w-3 h-3" /> Preview
+                            </button>
+                          </div>
+                          <textarea 
+                            rows={6}
+                            value={smtp.welcomeEmailTemplate} 
+                            onChange={e => setSmtp({...smtp, welcomeEmailTemplate: e.target.value})}
+                            className="w-full bg-surface border border-white/10 rounded-lg px-4 py-2 text-xs font-mono text-gray-300 focus:border-primary focus:outline-none resize-y transition-colors" 
+                          />
+                          <p className="text-[10px] text-gray-600 mt-1">Available: <code className="text-primary/70">{"{{name}}, {{email}}, {{password}}"}</code></p>
+                        </div>
+                      </div>
+
+                      {/* Booking Email */}
+                      <div className="p-5 bg-background rounded-xl border border-white/10 space-y-3">
+                        <div className="flex items-center gap-2 mb-3">
+                          <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                          <h4 className="font-semibold text-white">Booking Confirmation Email</h4>
+                          <span className="text-xs text-gray-500 ml-auto">Sent on booking</span>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-400 mb-1">Subject</label>
+                          <input 
+                            type="text" 
+                            value={smtp.bookingEmailSubject} 
+                            onChange={e => setSmtp({...smtp, bookingEmailSubject: e.target.value})}
+                            className={fieldClass} 
+                          />
+                        </div>
+                        <div>
+                          <div className="flex justify-between items-end mb-1">
+                            <label className="block text-xs font-medium text-gray-400">HTML Template</label>
+                            <button 
+                              onClick={() => setPreviewTemplate({ html: smtp.bookingEmailTemplate, type: 'booking' })}
+                              className="text-[10px] uppercase font-bold tracking-wider text-green-500 hover:text-green-400 transition-colors flex items-center gap-1"
+                            >
+                              <Eye className="w-3 h-3" /> Preview
+                            </button>
+                          </div>
                           <textarea 
                             rows={8}
-                            value={smtp.welcomeEmailTemplate || ''} 
-                            onChange={e => setSmtp({...smtp, welcomeEmailTemplate: e.target.value})}
-                            className="w-full bg-background border border-white/10 rounded-lg px-4 py-2 text-xs font-monospace text-gray-300 focus:border-primary focus:outline-none" 
-                          />
-                          <p className="text-[10px] text-gray-500 mt-1">Placeholders: {"{{name}}, {{email}}, {{password}}"}</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Booking Email Template */}
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                        <Mail className="w-5 h-5 text-green-500" />
-                        Booking Confirmation Template
-                      </h3>
-                      <div className="grid grid-cols-1 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-400 mb-1">Subject</label>
-                          <input 
-                            type="text" 
-                            value={smtp.bookingEmailSubject || ''} 
-                            onChange={e => setSmtp({...smtp, bookingEmailSubject: e.target.value})}
-                            className="w-full bg-background border border-white/10 rounded-lg px-4 py-2.5 text-white focus:border-primary focus:outline-none" 
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-400 mb-1">HTML Template</label>
-                          <textarea 
-                            rows={12}
-                            value={smtp.bookingEmailTemplate || ''} 
+                            value={smtp.bookingEmailTemplate} 
                             onChange={e => setSmtp({...smtp, bookingEmailTemplate: e.target.value})}
-                            className="w-full bg-background border border-white/10 rounded-lg px-4 py-2 text-xs font-monospace text-gray-300 focus:border-primary focus:outline-none" 
+                            className="w-full bg-surface border border-white/10 rounded-lg px-4 py-2 text-xs font-mono text-gray-300 focus:border-primary focus:outline-none resize-y transition-colors" 
                           />
-                          <p className="text-[10px] text-gray-500 mt-1">Placeholders: {"{{customerName}}, {{movieTitle}}, {{cinemaName}}, {{screen}}, {{date}}, {{time}}, {{seats}}, {{totalPrice}}, {{bookingId}}"}</p>
+                          <p className="text-[10px] text-gray-600 mt-1">Available: <code className="text-green-500/70">{"{{customerName}}, {{movieTitle}}, {{cinemaName}}, {{screen}}, {{date}}, {{time}}, {{seats}}, {{totalPrice}}, {{bookingId}}"}</code></p>
                         </div>
                       </div>
                     </div>
                   </div>
-                  
-                  <div className="md:col-span-2 pt-6 flex flex-wrap gap-4 border-t border-white/5">
+
+                  {/* Test Email */}
+                  <div className="p-5 bg-background rounded-xl border border-white/10">
+                    <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Send Test Email</h3>
+                    <div className="flex gap-3">
+                      <input
+                        type="email"
+                        value={testEmailAddress}
+                        onChange={e => setTestEmailAddress(e.target.value)}
+                        placeholder="recipient@example.com"
+                        className={cn(fieldClass, 'flex-1')}
+                      />
+                      <button 
+                        onClick={handleTestEmail}
+                        disabled={saving}
+                        className="flex items-center gap-2 px-5 py-2.5 bg-white/5 hover:bg-white/10 text-white border border-white/10 rounded-lg font-medium transition-colors disabled:opacity-50 whitespace-nowrap"
+                      >
+                        <Send className="w-4 h-4" />
+                        Send Test
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-600 mt-2">Before testing, make sure you have saved your SMTP settings and Email is Enabled.</p>
+                  </div>
+
+                  {/* Save Button */}
+                  <div className="pt-2 border-t border-white/5">
                     <button 
                       onClick={handleSaveEmail}
                       disabled={saving}
-                      className="flex items-center gap-2 px-6 py-2.5 bg-primary hover:bg-primary-hover text-white rounded-lg font-medium transition-colors shadow-lg shadow-primary/20 disabled:opacity-50"
+                      className="flex items-center gap-2 px-6 py-3 bg-primary hover:bg-primary-hover text-white rounded-xl font-medium transition-colors shadow-lg shadow-primary/20 disabled:opacity-50"
                     >
                       {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                      Save All Settings
-                    </button>
-                    <button 
-                      onClick={handleTestEmail}
-                      disabled={saving}
-                      className="flex items-center gap-2 px-6 py-2.5 bg-white/5 hover:bg-white/10 text-white border border-white/10 rounded-lg font-medium transition-colors disabled:opacity-50"
-                    >
-                      <Send className="w-4 h-4" />
-                      Send Test Email
+                      {saving ? 'Saving...' : 'Save All Settings'}
                     </button>
                   </div>
                 </div>
@@ -349,7 +475,40 @@ export function AdminSettings() {
           )}
         </div>
       </div>
+
+      {/* Preview Modal Overlay */}
+      <AnimatePresence>
+        {previewTemplate && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="w-full max-w-2xl bg-surface rounded-2xl overflow-hidden shadow-2xl border border-white/10 flex flex-col max-h-[90vh]"
+            >
+              <div className="p-4 border-b border-white/10 flex items-center justify-between bg-white/5">
+                <h3 className="font-bold text-lg flex items-center gap-2">
+                  <Eye className="w-5 h-5 text-primary" />
+                  Live HTML Preview ({previewTemplate.type === 'welcome' ? 'Welcome' : 'Booking'})
+                </h3>
+                <button 
+                  onClick={() => setPreviewTemplate(null)}
+                  className="p-1 text-gray-400 hover:text-white hover:bg-white/10 rounded transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+              <div className="flex-1 overflow-hidden bg-white">
+                <iframe
+                  title="Email Preview"
+                  className="w-full h-[600px] border-none"
+                  srcDoc={getCompiledTemplate(previewTemplate.html, previewTemplate.type)}
+                />
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
-

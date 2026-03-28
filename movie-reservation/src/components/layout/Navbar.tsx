@@ -120,8 +120,8 @@ export function Navbar() {
           </div>
 
           <div className="hidden md:flex items-center shrink-0">
-            <div className="flex items-baseline space-x-6">
-              {navItems.map((item) => {
+            <div className="flex items-center space-x-4 lg:space-x-6">
+              {navItems.filter(item => item.name !== 'Profile').map((item) => {
                 const Icon = item.icon;
                 const isActive = location.pathname === item.path || 
                                 (item.path !== '/' && location.pathname.startsWith(item.path));
@@ -149,14 +149,22 @@ export function Navbar() {
                 </Link>
               )}
               {isAuthenticated && user ? (
-                <div className="flex items-center gap-4 ml-2 pl-6 border-l border-white/10">
-                  <div className="flex items-center gap-3">
-                    <img src={user.avatar} alt="Avatar" className="w-8 h-8 rounded-full border-2 border-primary object-cover" />
-                    <span className="text-sm font-medium text-white hidden xl:block">{user.name}</span>
-                  </div>
+                <div className="flex items-center gap-2 ml-4 pl-4 border-l border-white/10">
+                  <Link 
+                    to="/profile" 
+                    className={cn(
+                      "flex items-center gap-3 px-3 py-1.5 rounded-full transition-all border",
+                      location.pathname.startsWith('/profile') 
+                        ? "bg-primary/10 border-primary/50 shadow-[0_0_15px_rgba(229,9,20,0.15)]" 
+                        : "border-transparent hover:bg-white/5"
+                    )}
+                  >
+                    <img src={user.avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${user.name}`} alt="Avatar" className="w-8 h-8 rounded-full border-2 border-primary/50 object-cover bg-surface shrink-0" />
+                    <span className="text-sm font-bold text-white hidden lg:block tracking-wide">{user.name}</span>
+                  </Link>
                   <button 
                     onClick={logout} 
-                    className="p-2 text-gray-400 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
+                    className="p-2 ml-1 text-gray-400 hover:text-red-400 hover:bg-red-400/10 rounded-full transition-colors"
                     title="Log out"
                   >
                     <LogOut className="w-5 h-5" />

@@ -1,48 +1,65 @@
-import React from 'react';
-import { Film, Ticket, Users, Calendar } from 'lucide-react';
-import { StatCard } from '@/components/admin/ui/StatCard';
-
-const recentActivities = [
-  { id: 1, action: 'New booking', details: 'Ticket #B-12345678 for Dune: Part Two', time: '5 minutes ago', status: 'success' },
-  { id: 2, action: 'User registered', details: 'john.doe@example.com joined', time: '1 hour ago', status: 'info' },
-  { id: 3, action: 'Ticket cancelled', details: 'Ticket #B-87654321 cancelled by user', time: '2 hours ago', status: 'warning' },
-  { id: 4, action: 'Showtime added', details: 'Oppenheimer at Cinemax IMAX', time: '5 hours ago', status: 'success' },
-];
+import React, { useMemo } from "react";
+import { Film, Ticket, Users, Calendar } from "lucide-react";
+import { StatCard } from "@/components/admin/ui/StatCard";
+import { useData } from "@/contexts/DataContext";
 
 export function AdminDashboard() {
+  const { tickets, movies, showtimes } = useData();
+
+  const { totalRevenue, ticketsSold, activeMovies, upcomingShowtimes } =
+    useMemo(() => {
+      return {
+        totalRevenue: tickets.reduce((acc, t) => acc + (t.totalPrice || 0), 0),
+        ticketsSold: tickets.length,
+        activeMovies: movies.length,
+        upcomingShowtimes: showtimes.length,
+      };
+    }, [tickets, movies, showtimes]);
+
+  const recentBookings = useMemo(() => {
+    return [...tickets]
+      .sort(
+        (a, b) =>
+          new Date(b.bookingDate).getTime() - new Date(a.bookingDate).getTime(),
+      )
+      .slice(0, 5);
+  }, [tickets]);
+
   return (
     <div className="space-y-8">
       <div>
         <h1 className="text-3xl font-display font-bold mb-2">Dashboard</h1>
-        <p className="text-gray-400">Welcome to the Cinemax Admin Control Panel.</p>
+        <p className="text-gray-400">
+          Welcome to the Cinemax Admin Control Panel.
+        </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard 
-          title="Total Revenue" 
-          value="$24,500" 
-          icon={Ticket} 
-          trend="12.5%" 
-          trendUp={true} 
+        <StatCard
+          title="Total Revenue"
+          value={`$${totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+          icon={Ticket}
+          trend="0%"
+          trendUp={true}
         />
-        <StatCard 
-          title="Tickets Sold" 
-          value="1,234" 
-          icon={Ticket} 
-          trend="8.2%" 
-          trendUp={true} 
+        <StatCard
+          title="Tickets Sold"
+          value={ticketsSold.toLocaleString()}
+          icon={Ticket}
+          trend="0%"
+          trendUp={true}
         />
-        <StatCard 
-          title="Active Movies" 
-          value="12" 
-          icon={Film} 
-          trend="0.0%" 
-          trendUp={true} 
+        <StatCard
+          title="Active Movies"
+          value={activeMovies.toString()}
+          icon={Film}
+          trend="0%"
+          trendUp={true}
         />
-        <StatCard 
-          title="Upcoming Showtimes" 
-          value="48" 
-          icon={Calendar} 
+        <StatCard
+          title="System Showtimes"
+          value={upcomingShowtimes.toString()}
+          icon={Calendar}
         />
       </div>
 
@@ -51,9 +68,11 @@ export function AdminDashboard() {
           <div className="bg-surface rounded-xl border border-white/5 p-6">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-bold">Recent Bookings</h2>
-              <button className="text-sm text-primary hover:text-primary-hover">View All</button>
+              <button className="text-sm text-primary hover:text-primary-hover">
+                View All
+              </button>
             </div>
-            
+
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead>
@@ -65,24 +84,43 @@ export function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
-                  <tr className="hover:bg-white/5 transition-colors">
-                    <td className="py-3">B-12345678</td>
-                    <td className="py-3">Dune: Part Two</td>
-                    <td className="py-3 text-gray-400">Today, 10:30 AM</td>
-                    <td className="py-3 text-right font-medium">$30.00</td>
-                  </tr>
-                  <tr className="hover:bg-white/5 transition-colors">
-                    <td className="py-3">B-87654321</td>
-                    <td className="py-3">Oppenheimer</td>
-                    <td className="py-3 text-gray-400">Yesterday, 14:20</td>
-                    <td className="py-3 text-right font-medium">$15.00</td>
-                  </tr>
-                  <tr className="hover:bg-white/5 transition-colors">
-                    <td className="py-3">B-55554444</td>
-                    <td className="py-3">The Batman</td>
-                    <td className="py-3 text-gray-400">Mar 24, 18:00</td>
-                    <td className="py-3 text-right font-medium">$25.00</td>
-                  </tr>
+                  {recentBookings.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={4}
+                        className="py-8 text-center text-gray-500"
+                      >
+                        No recent bookings found.
+                      </td>
+                    </tr>
+                  ) : (
+                    recentBookings.map((b) => {
+                      const mTitle =
+                        b.movieTitle ||
+                        movies.find((m) => m.id === b.movieId)?.title ||
+                        "Unknown";
+                      return (
+                        <tr
+                          key={b.id}
+                          className="hover:bg-white/5 transition-colors"
+                        >
+                          <td className="py-3 font-mono text-xs">{b.id}</td>
+                          <td
+                            className="py-3 font-medium text-white max-w-[150px] truncate"
+                            title={mTitle}
+                          >
+                            {mTitle}
+                          </td>
+                          <td className="py-3 text-gray-400">
+                            {new Date(b.bookingDate).toLocaleString()}
+                          </td>
+                          <td className="py-3 text-right font-medium text-primary">
+                            ${(b.totalPrice || 0).toFixed(2)}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
                 </tbody>
               </table>
             </div>
@@ -93,22 +131,41 @@ export function AdminDashboard() {
           <div className="bg-surface rounded-xl border border-white/5 p-6 h-full">
             <h2 className="text-lg font-bold mb-6">Recent Activity</h2>
             <div className="space-y-6">
-              {recentActivities.map((activity) => (
-                <div key={activity.id} className="flex gap-4">
-                  <div className="mt-1">
-                    <div className={`w-2 h-2 rounded-full ${
-                      activity.status === 'success' ? 'bg-green-500' :
-                      activity.status === 'warning' ? 'bg-yellow-500' :
-                      'bg-blue-500'
-                    }`} />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-white">{activity.action}</p>
-                    <p className="text-xs text-gray-400 mt-1">{activity.details}</p>
-                    <p className="text-xs text-gray-500 mt-2">{activity.time}</p>
-                  </div>
-                </div>
-              ))}
+              {recentBookings.length === 0 ? (
+                <p className="text-sm text-gray-500 text-center py-4">
+                  No activity recorded.
+                </p>
+              ) : (
+                recentBookings.map((activity) => {
+                  const mTitle =
+                    activity.movieTitle ||
+                    movies.find((m) => m.id === activity.movieId)?.title ||
+                    "Unknown Movie";
+                  const isCancel = activity.status === "cancelled";
+                  return (
+                    <div key={`act-${activity.id}`} className="flex gap-4">
+                      <div className="mt-1">
+                        <div
+                          className={`w-2 h-2 rounded-full ${
+                            isCancel ? "bg-red-500" : "bg-green-500"
+                          }`}
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-white">
+                          {isCancel ? "Ticket Cancelled" : "New Booking"}
+                        </p>
+                        <p className="text-xs text-gray-400 mt-1 truncate">
+                          Ticket {activity.id.substring(0, 8)} for {mTitle}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-2">
+                          {new Date(activity.bookingDate).toLocaleTimeString()}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </div>
           </div>
         </div>

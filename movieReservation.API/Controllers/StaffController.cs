@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using MovieReservation.Data;
 using MovieReservation.DTOs;
 using MovieReservation.Models;
+using MovieReservation.Services;
 
 namespace MovieReservation.Controllers;
 
@@ -29,7 +30,7 @@ public class StaffController : ControllerBase
     }
 
     [HttpPost]
-    public async Task<IActionResult> Create([FromBody] StaffCreateDto dto)
+    public async Task<IActionResult> Create([FromBody] StaffCreateDto dto, [FromServices] EmailService emailService)
     {
         if (await _db.Staff.AnyAsync(s => s.Email == dto.Email))
             return BadRequest(new { message = "Email already in use." });
@@ -44,6 +45,16 @@ public class StaffController : ControllerBase
         };
         _db.Staff.Add(staff);
         await _db.SaveChangesAsync();
+
+        _db.Staff.Add(staff);
+        await _db.SaveChangesAsync();
+
+        // Send Invitation Email using the unified service
+        await emailService.SendStaffInviteEmail(staff.Email, staff.Name, staff.Role, dto.Password);
+
+        return CreatedAtAction(nameof(GetById), new { id = staff.Id },
+            new StaffResponse(staff.Id, staff.Name, staff.Email, staff.Avatar, staff.Role, staff.Status, staff.CreatedAt));
+
         return CreatedAtAction(nameof(GetById), new { id = staff.Id },
             new StaffResponse(staff.Id, staff.Name, staff.Email, staff.Avatar, staff.Role, staff.Status, staff.CreatedAt));
     }

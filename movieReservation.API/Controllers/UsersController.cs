@@ -13,14 +13,21 @@ public class UsersController : ControllerBase
     public UsersController(AppDbContext db) => _db = db;
 
     [HttpGet]
-    public async Task<IActionResult> GetAll([FromQuery] string? status, [FromQuery] string? role)
+    public async Task<IActionResult> GetAll([FromQuery] string? status, [FromQuery] string? role, [FromQuery] PaginationParams pagination)
     {
-        var query = _db.Users.AsQueryable();
+        var query = _db.Users.AsNoTracking().AsQueryable();
         if (!string.IsNullOrEmpty(status)) query = query.Where(u => u.Status == status);
         if (!string.IsNullOrEmpty(role)) query = query.Where(u => u.Role == role);
 
-        var users = await query.OrderBy(u => u.Name).ToListAsync();
-        return Ok(users.Select(u => new UserResponse(u.Id, u.Name, u.Email, u.Phone, u.Role, u.Status, u.CreatedAt)));
+        var totalCount = await query.CountAsync();
+        var items = await query
+            .OrderBy(u => u.Name)
+            .Skip((pagination.PageNumber - 1) * pagination.PageSize)
+            .Take(pagination.PageSize)
+            .ToListAsync();
+
+        var responseItems = items.Select(u => new UserResponse(u.Id, u.Name, u.Email, u.Phone, u.Role, u.Status, u.CreatedAt)).ToList();
+        return Ok(new PagedResponse<UserResponse>(responseItems, totalCount, pagination.PageNumber, pagination.PageSize));
     }
 
     [HttpGet("{id}")]

@@ -1,6 +1,13 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { Movie, Cinema, Showtime, Booking } from '@/data/mock';
-import { api } from '@/services/api';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  ReactNode,
+} from "react";
+import { Movie, Cinema, Showtime, Booking } from "@/data/mock";
+import { api } from "@/services/api";
 
 export interface User {
   id: string;
@@ -8,7 +15,7 @@ export interface User {
   email: string;
   phone?: string;
   role: string;
-  status: 'active' | 'inactive' | 'locked';
+  status: "active" | "inactive" | "locked";
 }
 
 export interface Staff {
@@ -16,41 +23,46 @@ export interface Staff {
   name: string;
   email: string;
   role: string;
-  status: 'active' | 'inactive';
+  status: "active" | "inactive";
 }
 
 interface DataContextType {
   movies: Movie[];
   setMovies: React.Dispatch<React.SetStateAction<Movie[]>>;
-  addMovie: (movie: Omit<Movie, 'id'>) => Promise<void>;
+  addMovie: (movie: Omit<Movie, "id">) => Promise<void>;
   updateMovie: (movie: Movie) => Promise<void>;
   deleteMovie: (id: string) => Promise<void>;
   refreshMovies: () => Promise<void>;
 
   cinemas: Cinema[];
   setCinemas: React.Dispatch<React.SetStateAction<Cinema[]>>;
-  addCinema: (cinema: Omit<Cinema, 'id' | 'rooms'>) => Promise<void>;
+  addCinema: (cinema: Omit<Cinema, "id" | "rooms">) => Promise<void>;
   updateCinema: (cinema: Cinema) => Promise<void>;
   deleteCinema: (id: string) => Promise<void>;
   refreshCinemas: () => Promise<void>;
 
   showtimes: Showtime[];
   setShowtimes: React.Dispatch<React.SetStateAction<Showtime[]>>;
-  addShowtime: (showtime: Omit<Showtime, 'id'>) => Promise<void>;
+  addShowtime: (showtime: Omit<Showtime, "id">) => Promise<void>;
   updateShowtime: (showtime: Showtime) => Promise<void>;
   deleteShowtime: (id: string) => Promise<void>;
   refreshShowtimes: () => Promise<void>;
 
   tickets: Booking[];
   setTickets: React.Dispatch<React.SetStateAction<Booking[]>>;
-  addTicket: (ticket: Omit<Booking, 'id'>) => Promise<void>;
+  addTicket: (ticket: Omit<Booking, "id">) => Promise<void>;
   updateTicket: (ticket: Booking) => Promise<void>;
   deleteTicket: (id: string) => Promise<void>;
   refreshTickets: () => Promise<void>;
 
   staff: Staff[];
   setStaff: React.Dispatch<React.SetStateAction<Staff[]>>;
-  addStaff: (staffMember: { name: string; email: string; password: string; role: string }) => Promise<void>;
+  addStaff: (staffMember: {
+    name: string;
+    email: string;
+    password: string;
+    role: string;
+  }) => Promise<void>;
   updateStaff: (staffMember: Staff) => Promise<void>;
   deleteStaff: (id: string) => Promise<void>;
   refreshStaff: () => Promise<void>;
@@ -78,44 +90,85 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   // ── Fetch all data on mount ────────────────────────────
   const refreshMovies = useCallback(async () => {
-    try { setMovies(await api.get<Movie[]>('/movies')); } catch (e) { console.error('Failed to load movies', e); }
+    try {
+      const res: any = await api.get("/movies");
+      setMovies(res.items || res);
+    } catch (e) {
+      console.error("Failed to load movies", e);
+    }
   }, []);
 
   const refreshCinemas = useCallback(async () => {
-    try { setCinemas(await api.get<Cinema[]>('/cinemas')); } catch (e) { console.error('Failed to load cinemas', e); }
+    try {
+      const res: any = await api.get("/cinemas");
+      setCinemas(res.items || res);
+    } catch (e) {
+      console.error("Failed to load cinemas", e);
+    }
   }, []);
 
   const refreshShowtimes = useCallback(async () => {
-    try { setShowtimes(await api.get<Showtime[]>('/showtimes')); } catch (e) { console.error('Failed to load showtimes', e); }
+    try {
+      const res: any = await api.get("/showtimes");
+      setShowtimes(res.items || res);
+    } catch (e) {
+      console.error("Failed to load showtimes", e);
+    }
   }, []);
 
   const refreshTickets = useCallback(async () => {
-    try { setTickets(await api.get<Booking[]>('/bookings')); } catch (e) { console.error('Failed to load bookings', e); }
+    try {
+      const res: any = await api.get("/bookings");
+      setTickets(res.items || res);
+    } catch (e) {
+      console.error("Failed to load bookings", e);
+    }
   }, []);
 
   const refreshStaff = useCallback(async () => {
-    try { setStaff(await api.get<Staff[]>('/staff')); } catch (e) { console.error('Failed to load staff', e); }
+    try {
+      const res: any = await api.get("/staff");
+      setStaff(res.items || res);
+    } catch (e) {
+      console.error("Failed to load staff", e);
+    }
   }, []);
 
   const refreshUsers = useCallback(async () => {
-    try { setUsers(await api.get<User[]>('/users')); } catch (e) { console.error('Failed to load users', e); }
+    try {
+      const res: any = await api.get("/users");
+      setUsers(res.items || res);
+    } catch (e) {
+      console.error("Failed to load users", e);
+    }
   }, []);
 
   useEffect(() => {
     const loadAll = async () => {
       setLoading(true);
       await Promise.all([
-        refreshMovies(), refreshCinemas(), refreshShowtimes(),
-        refreshTickets(), refreshStaff(), refreshUsers()
+        refreshMovies(),
+        refreshCinemas(),
+        refreshShowtimes(),
+        refreshTickets(),
+        refreshStaff(),
+        refreshUsers(),
       ]);
       setLoading(false);
     };
     loadAll();
-  }, [refreshMovies, refreshCinemas, refreshShowtimes, refreshTickets, refreshStaff, refreshUsers]);
+  }, [
+    refreshMovies,
+    refreshCinemas,
+    refreshShowtimes,
+    refreshTickets,
+    refreshStaff,
+    refreshUsers,
+  ]);
 
   // ── CRUD: Movies ───────────────────────────────────────
-  const addMovie = async (movie: Omit<Movie, 'id'>) => {
-    await api.post('/movies', movie);
+  const addMovie = async (movie: Omit<Movie, "id">) => {
+    await api.post("/movies", movie);
     await refreshMovies();
   };
   const updateMovie = async (movie: Movie) => {
@@ -128,8 +181,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
   };
 
   // ── CRUD: Cinemas ──────────────────────────────────────
-  const addCinema = async (cinema: Omit<Cinema, 'id' | 'rooms'>) => {
-    await api.post('/cinemas', cinema);
+  const addCinema = async (cinema: Omit<Cinema, "id" | "rooms">) => {
+    await api.post("/cinemas", cinema);
     await refreshCinemas();
   };
   const updateCinema = async (cinema: Cinema) => {
@@ -142,8 +195,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
   };
 
   // ── CRUD: Showtimes ────────────────────────────────────
-  const addShowtime = async (showtime: Omit<Showtime, 'id'>) => {
-    await api.post('/showtimes', showtime);
+  const addShowtime = async (showtime: Omit<Showtime, "id">) => {
+    await api.post("/showtimes", showtime);
     await refreshShowtimes();
   };
   const updateShowtime = async (showtime: Showtime) => {
@@ -156,8 +209,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
   };
 
   // ── CRUD: Tickets (Bookings) ───────────────────────────
-  const addTicket = async (ticket: Omit<Booking, 'id'>) => {
-    await api.post('/bookings', ticket);
+  const addTicket = async (ticket: Omit<Booking, "id">) => {
+    await api.post("/bookings", ticket);
     await refreshTickets();
   };
   const updateTicket = async (ticket: Booking) => {
@@ -170,8 +223,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
   };
 
   // ── CRUD: Staff ────────────────────────────────────────
-  const addStaff = async (staffMember: { name: string; email: string; password: string; role: string }) => {
-    await api.post('/staff', staffMember);
+  const addStaff = async (staffMember: {
+    name: string;
+    email: string;
+    password: string;
+    role: string;
+  }) => {
+    await api.post("/staff", staffMember);
     await refreshStaff();
   };
   const updateStaff = async (staffMember: Staff) => {
@@ -184,7 +242,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   };
 
   // ── CRUD: Users ────────────────────────────────────────
-  const addUser = (user: User) => setUsers(prev => [...prev, user]);
+  const addUser = (user: User) => setUsers((prev) => [...prev, user]);
   const updateUser = async (user: User) => {
     await api.put(`/users/${user.id}`, user);
     await refreshUsers();
@@ -195,15 +253,47 @@ export function DataProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <DataContext.Provider value={{
-      movies, setMovies, addMovie, updateMovie, deleteMovie, refreshMovies,
-      cinemas, setCinemas, addCinema, updateCinema, deleteCinema, refreshCinemas,
-      showtimes, setShowtimes, addShowtime, updateShowtime, deleteShowtime, refreshShowtimes,
-      tickets, setTickets, addTicket, updateTicket, deleteTicket, refreshTickets,
-      staff, setStaff, addStaff, updateStaff, deleteStaff, refreshStaff,
-      users, setUsers, addUser, updateUser, deleteUser, refreshUsers,
-      loading
-    }}>
+    <DataContext.Provider
+      value={{
+        movies,
+        setMovies,
+        addMovie,
+        updateMovie,
+        deleteMovie,
+        refreshMovies,
+        cinemas,
+        setCinemas,
+        addCinema,
+        updateCinema,
+        deleteCinema,
+        refreshCinemas,
+        showtimes,
+        setShowtimes,
+        addShowtime,
+        updateShowtime,
+        deleteShowtime,
+        refreshShowtimes,
+        tickets,
+        setTickets,
+        addTicket,
+        updateTicket,
+        deleteTicket,
+        refreshTickets,
+        staff,
+        setStaff,
+        addStaff,
+        updateStaff,
+        deleteStaff,
+        refreshStaff,
+        users,
+        setUsers,
+        addUser,
+        updateUser,
+        deleteUser,
+        refreshUsers,
+        loading,
+      }}
+    >
       {children}
     </DataContext.Provider>
   );
@@ -211,6 +301,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
 export function useData() {
   const context = useContext(DataContext);
-  if (context === undefined) throw new Error('useData must be used within DataProvider');
+  if (context === undefined)
+    throw new Error("useData must be used within DataProvider");
   return context;
 }
