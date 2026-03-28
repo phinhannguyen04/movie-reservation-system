@@ -1,96 +1,95 @@
-# 🎬 Movie Reservation System — A-Z Guide
+# Movie Reservation System - Technical Documentation and Operation Guide
 
-Chào mừng bạn đến với hệ thống đặt vé xem phim chuyên nghiệp phiên bản hiện đại! Dưới đây là hướng dẫn chi tiết để bạn làm chủ toàn bộ hệ thống này từ cài đặt đến vận hành.
-
----
-
-## 1. Cài đặt và Khởi động (Setup)
-
-Hệ thống gồm 2 phần chính: **Backend (ASP.NET API)** và **Frontend (Vite + React)**.
-
-### a. Khởi động Database (Docker)
-Máy của bạn cần cài đặt **Docker Desktop**.
-1. Mở terminal tại thư mục `movie/movieReservation.API`.
-2. Chạy lệnh: `docker compose up -d postgres`.
-3. Kiểm tra cổng: Database sẽ chạy tại cổng **5433**.
-
-### b. Khởi động Backend (API)
-Bạn cần **.NET 8 SDK**.
-1. Mở project trong **Rider** hoặc VS Code.
-2. Nhấn **Run** hoặc dùng lệnh: `dotnet run`.
-3. API sẽ chạy tại: `http://localhost:5176`.
-4. Xem tài liệu API (Swagger) tại: `http://localhost:5176/swagger`.
-
-### c. Khởi động Frontend
-Bạn cần **Node.js**.
-1. Di chuyển vào thư mục `movie/movie-reservation`.
-2. Chạy: `npm install` (nếu là lần đầu).
-3. Chạy: `npm run dev`.
-4. Trang web sẽ chạy tại: `http://localhost:5173` (hoặc cổng lân cận tùy máy).
+This document provides comprehensive instructions for the installation, configuration, and maintenance of the Movie Reservation System.
 
 ---
 
-## 2. Tài khoản Đăng nhập Mẫu (Seed Data)
+## 1. System Installation and Initialization
 
-Hệ thống đã được cài đặt sẵn các tài khoản để bạn test nhanh:
+The system architecture consists of two primary components: the Backend (ASP.NET API) and the Frontend (Vite + React).
 
-| Vai trò | Email | Mật khẩu | Chức năng chính |
-|---------|-------|----------|-----------------|
-| **Admin** | `admin@example.com` | `admin123` | Quản lý phim, rạp, cài đặt Email |
-| **Manager** | `manager@example.com` | `manager123` | Quản lý rạp và suất chiếu |
-| **Customer** | `user@example.com` | `password123` | Đặt vé, xem lịch sử |
+### 1.1. Database Configuration (Docker)
+The local environment requires Docker Desktop to be installed and active.
+1. Open the terminal within the following directory: `movie/movieReservation.API`.
+2. Execute the command: `docker compose up -d postgres`.
+3. Connectivity: The database is configured to operate on port 5433.
 
----
+### 1.2. Backend Service Initialization (API)
+The environment requires the .NET 8 SDK.
+1. Open the project in JetBrains Rider or Visual Studio Code.
+2. Execute the application via the IDE or the terminal command: `dotnet run`.
+3. Base URL: `http://localhost:5176`.
+4. API Documentation (Swagger): `http://localhost:5176/swagger`.
 
-## 3. Cấu hình Email SMTP (Admin)
-
-Để hệ thống gửi được Email chào mừng và vé xem phim, Admin cần cấu hình:
-1. Đăng nhập bằng tài khoản **Admin**.
-2. Vào mục **Settings > Email Configuration**.
-3. Điền thông tin:
-   - **SMTP Host**: `smtp.gmail.com`
-   - **Port**: `587`
-   - **Username**: Gmail của bạn.
-   - **Password**: **App Password** của Google (mật khẩu ứng dụng 16 ký tự).
-   - **From Email/Name**: Địa chỉ và tên hiển thị khi gửi.
-4. Gạt nút **Status** sang **Enabled**.
-5. Nhấn **Save All Settings**.
+### 1.3. Frontend Application Initialization
+The environment requires Node.js.
+1. Navigate to the following directory: `movie/movie-reservation`.
+2. Install dependencies: `npm install`.
+3. Start the development server: `npm run dev`.
+4. Access URL: `http://localhost:5173`.
 
 ---
 
-## 4. Quản lý Email Template (Dynamic)
+## 2. Pre-configured Administrative Credentials
 
-Bạn có thể chỉnh sửa nội dung Email trực tiếp tại trang Admin mà không cần sửa code.
+The system includes seeded accounts for development and testing purposes:
 
-### Placeholder (Các biến động)
-Sử dụng các ký hiệu sau trong Template để hệ thống tự điền thông tin:
-- `{{name}}`: Tên người dùng.
-- `{{movieTitle}}`: Tên phim đã đặt.
-- `{{seats}}`: Danh sách ghế (VD: A1, A2).
-- `{{totalPrice}}`: Tổng tiền vé.
-- `{{bookingId}}`: Mã đặt vé (dùng để tạo QR Code).
-
-### Cách sửa:
-1. Copy HTML từ tệp `email_templates.md`.
-2. Dán vào khung soạn thảo **Welcome Email** hoặc **Booking Email**.
-3. Nhấn **Save**.
+| Role | Email | Password | Primary Responsibilities |
+| :--- | :--- | :--- | :--- |
+| Admin | admin@example.com | admin123 | Management of films, theaters, and email services. |
+| Manager | manager@example.com | manager123 | Management of theaters and screening schedules. |
+| Customer | user@example.com | password123 | Ticket reservations and booking history access. |
 
 ---
 
-## 5. Xử lý sự cố (Troubleshooting)
+## 3. SMTP Email Configuration
 
-### Lỗi "Fail to save settings"
-- **Nguyên nhân**: Database cũ chưa có các cột mới (WelcomeEmailSubject, ...).
-- **Khắc phục**: Tôi đã thêm cơ chế **Self-Healing** trong `Program.cs`. Chỉ cần bạn khởi động lại API, nó sẽ tự động nâng cấp Database cho bạn.
-
-### Không nhận được Email
-- Kiểm tra lại **App Password** của Gmail.
-- Kiểm tra xem đã bật chế độ **Enabled** trong Settings chưa.
-- Kiểm tra mục **Spam** trong hộp thư.
-
-### Lỗi CORS (Khi đổi cổng)
-- Nếu thay đổi cổng của Frontend (VD: sang 3001), hãy thêm cổng đó vào danh sách `WithOrigins` trong tệp `Program.cs` của Backend.
+Administrative users must configure SMTP settings to enable automated welcome messages and ticket confirmations:
+1. Authenticate with an Admin account.
+2. Navigate to Settings > Email Configuration.
+3. Input the following parameters:
+    - SMTP Host: `smtp.gmail.com`
+    - Port: `587`
+    - Username: Authorized Gmail address.
+    - Password: 16-character Google App Password.
+    - From Email/Name: Designated sender identity.
+4. Set the Status toggle to Enabled.
+5. Select Save All Settings.
 
 ---
 
-*Chúc bạn vận hành hệ thống thành công! Nếu có câu hỏi, hãy liên hệ với người phát triển.* 
+## 4. Dynamic Email Template Management
+
+The system supports real-time modification of email content via the administrative interface without requiring source code changes.
+
+### 4.1. Placeholders (Dynamic Variables)
+The following variables are supported within the templates for automated data injection:
+- `{{name}}`: Recipient name.
+- `{{movieTitle}}`: Reserved film title.
+- `{{seats}}`: Seat designations (e.g., A1, A2).
+- `{{totalPrice}}`: Aggregate reservation cost.
+- `{{bookingId}}`: Unique reservation identifier (utilized for QR Code generation).
+
+### 4.2. Modification Procedure
+1. Extract the HTML content from the `email_templates.md` file.
+2. Insert the code into the Welcome Email or Booking Email editor.
+3. Commit changes by selecting Save.
+
+---
+
+## 5. Troubleshooting and Maintenance
+
+### 5.1. Error: "Fail to save settings"
+- Root Cause: Potential schema mismatch between the current database and new configuration columns (e.g., WelcomeEmailSubject).
+- Resolution: The system utilizes a self-healing mechanism in `Program.cs`. Restarting the API service will trigger an automatic database migration to resolve schema discrepancies.
+
+### 5.2. Issue: Email Delivery Failure
+- Verify the accuracy of the Google App Password.
+- Ensure the Enabled status is active in the Email Configuration settings.
+- Inspect the recipient's spam folder.
+
+### 5.3. Error: CORS (Cross-Origin Resource Sharing)
+- If the Frontend port is modified (e.g., to port 3001), the new origin must be explicitly added to the `WithOrigins` list within the Backend `Program.cs` file.
+
+---
+End of Document
