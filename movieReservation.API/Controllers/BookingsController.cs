@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using MovieReservation.Data;
 using MovieReservation.Models;
 using MovieReservation.Services;
+using MovieReservation.DTOs;
 using System.Security.Claims;
 
 namespace MovieReservation.Controllers;
@@ -17,16 +18,22 @@ public class BookingsController : ControllerBase
     public BookingsController(AppDbContext db, EmailService emailService) { _db = db; _emailService = emailService; }
 
     [HttpGet]
-    public async Task<IActionResult> GetAll([FromQuery] Guid? movieId, [FromQuery] Guid? cinemaId, [FromQuery] string? status)
+    public async Task<IActionResult> GetAll([FromQuery] Guid? movieId, [FromQuery] Guid? cinemaId, [FromQuery] string? status, [FromQuery] PaginationParams pagination)
     {
-        var query = _db.Bookings.AsQueryable();
-
+        var query = _db.Bookings.AsNoTracking().AsQueryable();
+ 
         if (movieId.HasValue) query = query.Where(b => b.MovieId == movieId.Value);
         if (cinemaId.HasValue) query = query.Where(b => b.CinemaId == cinemaId.Value);
         if (!string.IsNullOrEmpty(status)) query = query.Where(b => b.Status == status);
+ 
+        var totalCount = await query.CountAsync();
+        var items = await query
+            .OrderByDescending(b => b.BookingDate)
+            .Skip((pagination.PageNumber - 1) * pagination.PageSize)
+            .Take(pagination.PageSize)
+            .ToListAsync();
 
-        var bookings = await query.OrderByDescending(b => b.BookingDate).ToListAsync();
-        return Ok(bookings.Select(b => MapToResponse(b)));
+        return Ok(new PagedResponse<object>(items.Select(b => MapToResponse(b)).ToList(), totalCount, pagination.PageNumber, pagination.PageSize));
     }
 
     [HttpGet("{id}")]
@@ -50,6 +57,11 @@ public class BookingsController : ControllerBase
         Guid.TryParse(dto.MovieId, out var movieGuid);
         Guid.TryParse(dto.CinemaId, out var cinemaGuid);
         Guid.TryParse(dto.ShowtimeId, out var showtimeGuid);
+        
+        // If JWT doesn't grab it, fallback to the provided client-side UserId
+        if (!userId.HasValue && !string.IsNullOrEmpty(dto.UserId) && Guid.TryParse(dto.UserId, out var clientUserId)) {
+            userId = clientUserId;
+        }
 
         var booking = new Booking
         {
@@ -59,7 +71,7 @@ public class BookingsController : ControllerBase
             UserId       = userId,
             Seats        = dto.Seats ?? new List<string>(),
             TotalPrice   = dto.TotalPrice,
-            BookingDate  = DateTime.UtcNow,
+            BookingDate  = dto.BookingDate ?? DateTime.UtcNow,
             Status       = "confirmed",
             MovieTitle   = dto.MovieTitle ?? string.Empty,
             CinemaName   = dto.CinemaName ?? string.Empty,
@@ -67,8 +79,36 @@ public class BookingsController : ControllerBase
             Screen       = dto.Screen ?? string.Empty,
         };
 
-        _db.Bookings.Add(booking);
-        await _db.SaveChangesAsync();
+        // Use a Transaction to ensure serializable seat checking in high concurrency
+        using var transaction = await _db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
+        try
+        {
+            var targetDate = booking.BookingDate.Date;
+            var existingSeats = await _db.Bookings
+                .Where(b => b.MovieTitle == booking.MovieTitle 
+                         && b.CinemaName == booking.CinemaName 
+                         && b.Showtime == booking.Showtime 
+                         && b.Screen == booking.Screen 
+                         && b.BookingDate.Date == targetDate
+                         && b.Status != "cancelled")
+                .SelectMany(b => b.Seats)
+                .ToListAsync();
+
+            if (booking.Seats.Any(s => existingSeats.Contains(s)))
+            {
+                return BadRequest(new { message = "Xin lỗi, ghế bạn chọn vừa có người khác đặt xong! Vui lòng chọn ghế khác." });
+            }
+
+            _db.Bookings.Add(booking);
+            await _db.SaveChangesAsync();
+            await transaction.CommitAsync();
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            return StatusCode(500, new { message = "Lỗi hệ thống khi xử lý đặt vé. Vui lòng thử lại." });
+        }
+
 
         // Send booking confirmation email via fire-and-forget
         if (userId.HasValue)
@@ -129,6 +169,6 @@ public class BookingsController : ControllerBase
 public record FlexibleBookingDto(
     string? MovieId, string? CinemaId, string? ShowtimeId,
     List<string>? Seats, decimal TotalPrice,
-    string? MovieTitle, string? CinemaName, string? Showtime, string? Screen);
+    string? MovieTitle, string? CinemaName, string? Showtime, string? Screen, string? UserId, DateTime? BookingDate);
 
 public record BookingUpdateRequestDto(string Status);

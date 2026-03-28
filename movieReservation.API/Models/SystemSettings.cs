@@ -30,9 +30,9 @@ public class SystemSettings
     public bool EmailEnabled { get; set; } = false; // Disabled by default until configured
 
     // Email Templates
-    public string WelcomeEmailSubject { get; set; } = "Welcome to Movie Reservation! 🎬";
+    public string WelcomeEmailSubject { get; set; } = "Welcome to Movie Reservation!";
     public string WelcomeEmailTemplate { get; set; } = ""; // Will be seeded with default HTML
 
-    public string BookingEmailSubject { get; set; } = "🎟️ Booking Confirmed!";
+    public string BookingEmailSubject { get; set; } = "Booking Confirmed!";
     public string BookingEmailTemplate { get; set; } = ""; // Will be seeded with default HTML
 }

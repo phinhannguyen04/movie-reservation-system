@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Bookmark, User, Mail, Loader2, Save, Send, Eye, EyeOff, CheckCircle, AlertCircle, Info } from 'lucide-react';
+import { Settings, Bookmark, User, Mail, Loader2, Save, Send, Eye, EyeOff, CheckCircle, AlertCircle, Info, X } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/lib/utils';
 import { api } from '@/services/api';
 
@@ -38,10 +39,33 @@ export function AdminSettings() {
   const [toast, setToast] = useState<Toast | null>(null);
   const [showSmtpPassword, setShowSmtpPassword] = useState(false);
   const [testEmailAddress, setTestEmailAddress] = useState('');
+  const [previewTemplate, setPreviewTemplate] = useState<{ html: string; type: 'welcome' | 'booking' } | null>(null);
 
   const showToast = (type: ToastType, message: string) => {
     setToast({ type, message });
     setTimeout(() => setToast(null), 5000);
+  };
+
+  const getCompiledTemplate = (html: string, type: 'welcome' | 'booking') => {
+    let result = html || '';
+    if (type === 'welcome') {
+      result = result
+        .replace(/{{name}}/g, 'John Doe')
+        .replace(/{{email}}/g, 'john.doe@example.com')
+        .replace(/{{password}}/g, '********');
+    } else {
+      result = result
+        .replace(/{{customerName}}/g, 'John Doe')
+        .replace(/{{movieTitle}}/g, 'Dune: Part Two')
+        .replace(/{{cinemaName}}/g, 'Cinemax IMAX')
+        .replace(/{{screen}}/g, 'Screen 1')
+        .replace(/{{date}}/g, '2026-10-24')
+        .replace(/{{time}}/g, '19:00')
+        .replace(/{{seats}}/g, 'G6, G7')
+        .replace(/{{totalPrice}}/g, '30.00')
+        .replace(/{{bookingId}}/g, 'B-AX91023D');
+    }
+    return result;
   };
 
   // Email Configuration State
@@ -354,7 +378,15 @@ export function AdminSettings() {
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-medium text-gray-400 mb-1">HTML Template</label>
+                          <div className="flex justify-between items-end mb-1">
+                            <label className="block text-xs font-medium text-gray-400">HTML Template</label>
+                            <button 
+                              onClick={() => setPreviewTemplate({ html: smtp.welcomeEmailTemplate, type: 'welcome' })}
+                              className="text-[10px] uppercase font-bold tracking-wider text-primary hover:text-primary-hover transition-colors flex items-center gap-1"
+                            >
+                              <Eye className="w-3 h-3" /> Preview
+                            </button>
+                          </div>
                           <textarea 
                             rows={6}
                             value={smtp.welcomeEmailTemplate} 
@@ -382,7 +414,15 @@ export function AdminSettings() {
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-medium text-gray-400 mb-1">HTML Template</label>
+                          <div className="flex justify-between items-end mb-1">
+                            <label className="block text-xs font-medium text-gray-400">HTML Template</label>
+                            <button 
+                              onClick={() => setPreviewTemplate({ html: smtp.bookingEmailTemplate, type: 'booking' })}
+                              className="text-[10px] uppercase font-bold tracking-wider text-green-500 hover:text-green-400 transition-colors flex items-center gap-1"
+                            >
+                              <Eye className="w-3 h-3" /> Preview
+                            </button>
+                          </div>
                           <textarea 
                             rows={8}
                             value={smtp.bookingEmailTemplate} 
@@ -435,6 +475,40 @@ export function AdminSettings() {
           )}
         </div>
       </div>
+
+      {/* Preview Modal Overlay */}
+      <AnimatePresence>
+        {previewTemplate && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="w-full max-w-2xl bg-surface rounded-2xl overflow-hidden shadow-2xl border border-white/10 flex flex-col max-h-[90vh]"
+            >
+              <div className="p-4 border-b border-white/10 flex items-center justify-between bg-white/5">
+                <h3 className="font-bold text-lg flex items-center gap-2">
+                  <Eye className="w-5 h-5 text-primary" />
+                  Live HTML Preview ({previewTemplate.type === 'welcome' ? 'Welcome' : 'Booking'})
+                </h3>
+                <button 
+                  onClick={() => setPreviewTemplate(null)}
+                  className="p-1 text-gray-400 hover:text-white hover:bg-white/10 rounded transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+              <div className="flex-1 overflow-hidden bg-white">
+                <iframe
+                  title="Email Preview"
+                  className="w-full h-[600px] border-none"
+                  srcDoc={getCompiledTemplate(previewTemplate.html, previewTemplate.type)}
+                />
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

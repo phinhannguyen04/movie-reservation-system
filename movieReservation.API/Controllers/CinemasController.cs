@@ -14,12 +14,21 @@ public class CinemasController : ControllerBase
     public CinemasController(AppDbContext db) => _db = db;
 
     [HttpGet]
-    public async Task<IActionResult> GetAll()
+    public async Task<IActionResult> GetAll([FromQuery] PaginationParams pagination)
     {
-        var cinemas = await _db.Cinemas.Include(c => c.Rooms).OrderBy(c => c.Name).ToListAsync();
-        return Ok(cinemas.Select(c => new CinemaResponse(
+        var query = _db.Cinemas.AsNoTracking().Include(c => c.Rooms).OrderBy(c => c.Name).AsQueryable();
+        
+        var totalCount = await query.CountAsync();
+        var items = await query
+            .Skip((pagination.PageNumber - 1) * pagination.PageSize)
+            .Take(pagination.PageSize)
+            .ToListAsync();
+
+        var responseItems = items.Select(c => new CinemaResponse(
             c.Id, c.Name, c.Address, c.Distance,
-            c.Rooms.Select(r => new RoomResponse(r.Id, r.Name, r.Capacity, r.Format, r.CinemaId)).ToList())));
+            c.Rooms.Select(r => new RoomResponse(r.Id, r.Name, r.Capacity, r.Format, r.CinemaId)).ToList())).ToList();
+
+        return Ok(new PagedResponse<CinemaResponse>(responseItems, totalCount, pagination.PageNumber, pagination.PageSize));
     }
 
     [HttpGet("{id}")]

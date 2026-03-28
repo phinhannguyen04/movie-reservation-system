@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { api } from '@/services/api';
 
 interface AuthUser {
+  id: string;
   name: string;
   email: string;
   avatar: string | null;
@@ -18,6 +19,7 @@ interface AuthContextType {
 }
 
 interface AuthResponse {
+  id: string;
   token: string;
   name: string;
   email: string;
@@ -33,9 +35,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const savedUser = localStorage.getItem('authUser');
+    const token = localStorage.getItem('authToken');
     if (savedUser) {
       try {
-        setUser(JSON.parse(savedUser));
+        const parsed = JSON.parse(savedUser);
+        if (parsed && !parsed.id && token) {
+          // Attempt to decode JWT to salvage the missing ID (legacy state handling)
+          try {
+            const payload = JSON.parse(atob(token.split('.')[1]));
+            // Microsoft identity standard claim for NameIdentifier
+            parsed.id = payload["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"] || payload.sub || payload.nameid;
+            if (parsed.id) {
+              localStorage.setItem('authUser', JSON.stringify(parsed));
+            } else {
+              throw new Error('No ID in token');
+            }
+          } catch(e) {
+            // Force logout if we can't repair it
+            localStorage.removeItem('authUser');
+            localStorage.removeItem('authToken');
+            setUser(null);
+            return;
+          }
+        }
+        setUser(parsed);
       } catch (e) {
         console.error('Failed to parse saved user', e);
       }
@@ -46,6 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const data = await api.post<AuthResponse>('/auth/login', { email, password });
       const authUser: AuthUser = {
+        id: data.id,
         name: data.name,
         email: data.email,
         avatar: data.avatar,
@@ -66,6 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const data = await api.post<AuthResponse>('/auth/register', { name, email, password, phone });
       const authUser: AuthUser = {
+        id: data.id,
         name: data.name,
         email: data.email,
         avatar: data.avatar,

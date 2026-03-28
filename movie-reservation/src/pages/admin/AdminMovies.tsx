@@ -5,12 +5,21 @@ import { Modal } from '@/components/admin/ui/Modal';
 import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/contexts/DataContext';
 import { SearchableSelect } from '@/components/admin/ui/SearchableSelect';
+import { api } from '@/services/api';
+import { RefreshCw, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 
 export function AdminMovies() {
   const { user } = useAuth();
   const { movies: data, addMovie, updateMovie, deleteMovie } = useData();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingMovie, setEditingMovie] = useState<Movie | null>(null);
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string; } | null>(null);
+
+  const showToast = (type: 'success' | 'error', message: string) => {
+    setToast({ type, message });
+    setTimeout(() => setToast(null), 5000);
+  };
 
   // ── Filters ─────────────────────────────────────────────────
   const [statusFilter, setStatusFilter] = useState('all');
@@ -224,6 +233,25 @@ export function AdminMovies() {
           </div>
         </form>
       </Modal>
+
+      {/* Toast Notification */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 50 }}
+            className={`fixed bottom-4 right-4 z-50 flex items-center gap-3 px-6 py-4 rounded-xl shadow-2xl border backdrop-blur-md ${
+              toast.type === 'success' 
+                ? 'bg-green-500/10 border-green-500/20 text-green-400' 
+                : 'bg-red-500/10 border-red-500/20 text-red-400'
+            }`}
+          >
+            {toast.type === 'success' ? <CheckCircle className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
+            <p className="font-medium">{toast.message}</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

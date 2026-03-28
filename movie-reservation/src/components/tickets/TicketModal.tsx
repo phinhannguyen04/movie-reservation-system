@@ -106,7 +106,7 @@ export function TicketModal({ isOpen, onClose, booking, movie, cinema }: TicketM
                     <p className="text-xs text-gray-500 uppercase tracking-wider mb-1 flex items-center gap-1">
                       <Clock className="w-3 h-3" /> Time
                     </p>
-                    <p className="font-medium text-white">19:30</p>
+                    <p className="font-medium text-white">{booking.showtime || '—'}</p>
                   </div>
                   <div>
                     <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Seats</p>
@@ -114,7 +114,7 @@ export function TicketModal({ isOpen, onClose, booking, movie, cinema }: TicketM
                   </div>
                   <div>
                     <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Screen</p>
-                    <p className="font-medium text-white">Screen 3</p>
+                    <p className="font-medium text-white">{booking.screen || 'Unknown'}</p>
                   </div>
                 </div>
 

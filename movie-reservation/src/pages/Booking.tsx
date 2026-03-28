@@ -108,6 +108,7 @@ export function Booking() {
         cinemaName: cinema?.name || '',
         screen: selectedShowtime?.screen || '',
         movieTitle: movie.title,
+        userId: user.id, // Ensure user id propagates to the backend
       };
 
       const result = await api.post<{ id: string; bookingId?: string }>(

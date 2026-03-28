@@ -14,33 +14,39 @@ public class MoviesController : ControllerBase
     public MoviesController(AppDbContext db) => _db = db;
 
     [HttpGet]
-    public async Task<IActionResult> GetAll([FromQuery] string? genre, [FromQuery] string? rating, [FromQuery] string? status)
+    public async Task<IActionResult> GetAll([FromQuery] string? genre, [FromQuery] string? rating, [FromQuery] string? status, [FromQuery] PaginationParams pagination)
     {
-        var query = _db.Movies.AsQueryable();
+        var query = _db.Movies.AsNoTracking().AsQueryable();
         
         if (!string.IsNullOrEmpty(genre))
             query = query.Where(m => m.Genre.Contains(genre));
         
         if (!string.IsNullOrEmpty(rating))
             query = query.Where(m => m.Rating == rating);
-        
-        var movies = await query.OrderByDescending(m => m.ReleaseDate).ToListAsync();
 
         if (!string.IsNullOrEmpty(status))
         {
             var now = DateTime.UtcNow;
-            movies = status switch
+            query = status.ToLower() switch
             {
-                "showing" => movies.Where(m => m.ReleaseDate <= now && (m.EndDate == null || m.EndDate >= now)).ToList(),
-                "upcoming" => movies.Where(m => m.ReleaseDate > now).ToList(),
-                "ended" => movies.Where(m => m.EndDate != null && m.EndDate < now).ToList(),
-                _ => movies
+                "showing" => query.Where(m => m.ReleaseDate <= now && (m.EndDate == null || m.EndDate >= now)),
+                "upcoming" => query.Where(m => m.ReleaseDate > now),
+                "ended" => query.Where(m => m.EndDate != null && m.EndDate < now),
+                _ => query
             };
         }
+        
+        var totalCount = await query.CountAsync();
+        var items = await query
+            .OrderByDescending(m => m.ReleaseDate)
+            .Skip((pagination.PageNumber - 1) * pagination.PageSize)
+            .Take(pagination.PageSize)
+            .Select(m => new MovieResponse(
+                m.Id, m.Title, m.PosterUrl, m.BackdropUrl, m.Genre, m.Duration, m.Rating,
+                m.ReleaseDate, m.EndDate, m.Synopsis, m.Director, m.Cast, m.TrailerUrl))
+            .ToListAsync();
 
-        return Ok(movies.Select(m => new MovieResponse(
-            m.Id, m.Title, m.PosterUrl, m.BackdropUrl, m.Genre, m.Duration, m.Rating,
-            m.ReleaseDate, m.EndDate, m.Synopsis, m.Director, m.Cast, m.TrailerUrl)));
+        return Ok(new PagedResponse<MovieResponse>(items, totalCount, pagination.PageNumber, pagination.PageSize));
     }
 
     [HttpGet("{id}")]
@@ -93,4 +99,6 @@ public class MoviesController : ControllerBase
         await _db.SaveChangesAsync();
         return NoContent();
     }
+
+
 }
