@@ -49,6 +49,13 @@ export function Notifications() {
   const [localNotifications, setLocalNotifications] = useState<Notification[]>([]);
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
 
+  const [readIds, setReadIds] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('notification_read_ids') || '[]')); } catch { return new Set(); }
+  });
+  const [deletedIds, setDeletedIds] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('notification_deleted_ids') || '[]')); } catch { return new Set(); }
+  });
+
   // Build notifications from real booking data + system notifications
   useEffect(() => {
     const bookingNotifs: Notification[] = tickets
@@ -69,14 +76,16 @@ export function Notifications() {
           }
         })();
 
+        const notifId = `booking-${booking.id}`;
+
         if (booking.status === 'cancelled') {
           return {
-            id: `booking-${booking.id}`,
+            id: notifId,
             type: 'ticket',
             title: 'Booking Cancelled',
             message: `Your booking for "${movieTitle}" has been cancelled.`,
             time: timeStr,
-            read: !isRecent,
+            read: !isRecent || readIds.has(notifId),
             icon: Ticket,
             color: 'text-red-500',
             bg: 'bg-red-500/10',
@@ -84,32 +93,46 @@ export function Notifications() {
         }
 
         return {
-          id: `booking-${booking.id}`,
+          id: notifId,
           type: 'ticket',
           title: 'Booking Confirmed! 🎬',
           message: `Your ${booking.seats?.length || 1} ticket(s) for "${movieTitle}" at ${booking.cinemaName || 'the cinema'} on ${
             (() => { try { return format(new Date(booking.bookingDate), 'dd MMM yyyy'); } catch { return ''; } })()
           } (${booking.showtime || ''}) — Seats: ${booking.seats?.join(', ') || '—'}.`,
           time: timeStr,
-          read: !isRecent,
+          read: !isRecent || readIds.has(notifId),
           icon: CheckCircle2,
           color: 'text-green-500',
           bg: 'bg-green-500/10',
         };
       });
     
-    setLocalNotifications([...bookingNotifs, ...systemNotifications]);
-  }, [tickets, user?.id]);
+    const allNotifs = [...bookingNotifs, ...systemNotifications]
+      .map(n => ({ ...n, read: n.read || readIds.has(n.id) }))
+      .filter(n => !deletedIds.has(n.id));
+
+    setLocalNotifications(allNotifs);
+  }, [tickets, user?.id]); // Only runs on ticket updates; manual reads update state directly.
 
   const handleMarkAllAsRead = () => {
+    const newReadIds = new Set(readIds);
+    localNotifications.forEach(n => newReadIds.add(n.id));
+    setReadIds(newReadIds);
+    localStorage.setItem('notification_read_ids', JSON.stringify([...newReadIds]));
     setLocalNotifications(prev => prev.map(n => ({ ...n, read: true })));
   };
 
   const handleMarkAsRead = (id: string) => {
+    const newReadIds = new Set(readIds).add(id);
+    setReadIds(newReadIds);
+    localStorage.setItem('notification_read_ids', JSON.stringify([...newReadIds]));
     setLocalNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
   };
 
   const handleDelete = (id: string) => {
+    const newDeletedIds = new Set(deletedIds).add(id);
+    setDeletedIds(newDeletedIds);
+    localStorage.setItem('notification_deleted_ids', JSON.stringify([...newDeletedIds]));
     setLocalNotifications(prev => prev.filter(n => n.id !== id));
   };
 

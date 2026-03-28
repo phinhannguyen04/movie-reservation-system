@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { DataTable } from '@/components/admin/ui/DataTable';
 import { Modal } from '@/components/admin/ui/Modal';
 import { useAuth } from '@/contexts/AuthContext';
-import { useData, Staff } from '@/contexts/DataContext';
-import { Shield, Check, X, UserPlus } from 'lucide-react';
+import { Shield, Check, X, UserPlus, Mail, Settings, Eye, Loader2 } from 'lucide-react';
+import { api } from '@/services/api';
 
 // ── Role Permission Definitions ──────────────────────────────────
 export const SYSTEM_ROLES = [
@@ -64,26 +64,71 @@ const MODULES = ['dashboard', 'movies', 'cinemas', 'showtimes', 'tickets', 'user
 
 export function AdminStaff() {
   const { user } = useAuth();
-  const { staff, addStaff, updateStaff, deleteStaff } = useData();
+  const { staff, addStaff, updateStaff, deleteStaff, users } = useData();
 
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
   const [activeTab, setActiveTab] = useState<'list' | 'roles'>('list');
+  const [inviteEmailSearch, setInviteEmailSearch] = useState('');
+
+  // ── Email Config State ──────────────────────────────────────────
+  const [isConfigOpen, setIsConfigOpen] = useState(false);
+  const [emailSettings, setEmailSettings] = useState<any>(null);
+  const [previewTemplate, setPreviewTemplate] = useState<{ html: string } | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  React.useEffect(() => {
+    if (isConfigOpen && !emailSettings) {
+      api.get('/settings/email').then(res => setEmailSettings(res)).catch(err => console.error(err));
+    }
+  }, [isConfigOpen, emailSettings]);
+
+  const handleSaveConfig = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSaving(true);
+    try {
+      await api.put('/settings/email', emailSettings);
+      setIsConfigOpen(false);
+    } catch {
+      alert("Failed to save email settings.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const getCompiledTemplate = (html: string) => {
+    return (html || '')
+      .replace(/{{name}}/g, 'Jane Doe')
+      .replace(/{{email}}/g, 'jane.doe@cinemax.example.com')
+      .replace(/{{password}}/g, 'tempPass123!')
+      .replace(/{{role}}/g, 'admin');
+  };
+
+  const searchResults = React.useMemo(() => {
+    if (!inviteEmailSearch.trim()) return [];
+    const query = inviteEmailSearch.toLowerCase();
+    return users.filter(u => u.email.toLowerCase().includes(query) || u.name.toLowerCase().includes(query)).slice(0, 5);
+  }, [inviteEmailSearch, users]);
+
+  const foundUser = React.useMemo(() => {
+    if (!inviteEmailSearch.trim()) return null;
+    return users.find(u => u.email.toLowerCase() === inviteEmailSearch.trim().toLowerCase()) || null;
+  }, [inviteEmailSearch, users]);
 
   // ── Invite Staff Submit ──────────────────────────────────────────
   const handleInviteSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!foundUser) return;
     const fd = new FormData(e.target as HTMLFormElement);
-    const newStaff: Staff = {
-      id: `s${Date.now()}`,
-      name: fd.get('name') as string,
-      email: fd.get('email') as string,
+    addStaff({
+      name: foundUser.name,
+      email: foundUser.email,
+      password: "password123",
       role: fd.get('role') as string,
-      status: 'active',
-    };
-    addStaff(newStaff);
+    });
     setIsInviteOpen(false);
+    setInviteEmailSearch('');
   };
 
   // ── Edit Staff Submit ──────────────────────────────────────────
@@ -253,18 +298,65 @@ export function AdminStaff() {
       {/* ── Invite Staff Modal ────────────────────────── */}
       <Modal isOpen={isInviteOpen} onClose={() => setIsInviteOpen(false)} title="Invite New Staff Member">
         <form onSubmit={handleInviteSubmit} className="space-y-4">
-          <div className="flex items-center gap-3 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg text-sm text-blue-300">
-            <UserPlus className="w-5 h-5 flex-shrink-0" />
-            The new staff member will receive an email invitation to set up their account.
+          <div className="flex items-start justify-between p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg text-sm text-blue-300">
+            <div className="flex items-center gap-3">
+              <UserPlus className="w-5 h-5 flex-shrink-0" />
+              <span>The new staff member will receive an email invitation to set up their account.</span>
+            </div>
+            <button 
+              type="button" 
+              onClick={() => setIsConfigOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500/20 hover:bg-blue-500/30 text-blue-200 rounded-md transition-colors text-xs font-semibold uppercase tracking-wide"
+            >
+              <Settings className="w-3.5 h-3.5" /> Configure Mail
+            </button>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">Full Name</label>
-            <input name="name" required type="text" className="w-full bg-background border border-white/10 rounded-lg px-4 py-2.5 text-white focus:border-primary focus:outline-none" placeholder="e.g. Jane Doe" />
+          <div className="relative">
+            <label className="block text-sm font-medium text-gray-300 mb-1">Search User by Email or Name</label>
+            <input 
+              required 
+              type="text" 
+              value={inviteEmailSearch}
+              onChange={e => setInviteEmailSearch(e.target.value)}
+              className="w-full bg-background border border-white/10 rounded-lg px-4 py-2.5 text-white focus:border-primary focus:outline-none placeholder-gray-600" 
+              placeholder="e.g. John or user@example.com" 
+              autoComplete="off"
+            />
+            {inviteEmailSearch.trim() !== '' && !foundUser && searchResults.length > 0 && (
+              <div className="absolute z-10 w-full mt-1 bg-surface border border-white/10 rounded-lg shadow-2xl max-h-48 overflow-y-auto">
+                {searchResults.map(u => (
+                  <button 
+                    key={u.id}
+                    type="button"
+                    onClick={() => setInviteEmailSearch(u.email)}
+                    className="w-full text-left px-4 py-2 hover:bg-white/5 flex flex-col transition-colors border-b border-white/5 last:border-0"
+                  >
+                    <span className="font-bold text-white text-sm">{u.name}</span>
+                    <span className="text-xs text-gray-400">{u.email}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">Email Address</label>
-            <input name="email" required type="email" className="w-full bg-background border border-white/10 rounded-lg px-4 py-2.5 text-white focus:border-primary focus:outline-none" placeholder="jane@cinemax.com" />
-          </div>
+          
+          {inviteEmailSearch.trim() !== '' && (
+            <div className="p-3 rounded-lg border border-white/10 bg-surface">
+              {foundUser ? (
+                <div className="flex items-center gap-3">
+                   <img src={`https://api.dicebear.com/7.x/initials/svg?seed=${foundUser.name}`} className="w-10 h-10 rounded-full border-2 border-primary/30" />
+                   <div>
+                     <p className="font-bold text-white text-sm">{foundUser.name}</p>
+                     <p className="text-xs text-green-400 flex items-center gap-1"><Check className="w-3 h-3" /> System user found</p>
+                   </div>
+                </div>
+              ) : (
+                <div className="flex items-start gap-2 text-red-400">
+                  <X className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                  <p className="text-sm">User not found in system. Please enter a registered email.</p>
+                </div>
+              )}
+            </div>
+          )}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1">Assign Role</label>
             <select name="role" required className="w-full bg-background border border-white/10 rounded-lg px-4 py-2.5 text-white focus:border-primary focus:outline-none">
@@ -275,7 +367,7 @@ export function AdminStaff() {
           </div>
           <div className="pt-4 flex justify-end gap-3">
             <button type="button" onClick={() => setIsInviteOpen(false)} className="px-4 py-2 hover:bg-white/5 text-white rounded-lg transition-colors text-sm font-medium">Cancel</button>
-            <button type="submit" className="px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-lg transition-colors text-sm font-medium flex items-center gap-2">
+            <button type="submit" disabled={!foundUser} className="px-4 py-2 bg-primary hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors text-sm font-medium flex items-center gap-2">
               <UserPlus className="w-4 h-4" /> Send Invitation
             </button>
           </div>
@@ -316,6 +408,73 @@ export function AdminStaff() {
           </div>
         </form>
       </Modal>
+
+      {/* ── Email Config Modal ────────────────────────── */}
+      <Modal isOpen={isConfigOpen} onClose={() => setIsConfigOpen(false)} title="Configure Invite Email">
+        {emailSettings ? (
+          <form onSubmit={handleSaveConfig} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Subject</label>
+              <input 
+                required 
+                type="text" 
+                value={emailSettings.staffInviteEmailSubject || ''}
+                onChange={e => setEmailSettings({ ...emailSettings, staffInviteEmailSubject: e.target.value })}
+                className="w-full bg-background border border-white/10 rounded-lg px-4 py-2.5 text-white focus:border-primary focus:outline-none placeholder-gray-600" 
+              />
+            </div>
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                 <label className="block text-sm font-medium text-gray-300">HTML Template</label>
+                 <button 
+                  type="button"
+                  onClick={() => setPreviewTemplate({ html: emailSettings.staffInviteEmailTemplate || '' })}
+                  className="text-xs uppercase font-bold tracking-wider text-primary hover:text-primary-hover transition-colors flex items-center gap-1"
+                 >
+                   <Eye className="w-3.5 h-3.5" /> Preview
+                 </button>
+              </div>
+              <textarea 
+                required 
+                rows={10}
+                value={emailSettings.staffInviteEmailTemplate || ''}
+                onChange={e => setEmailSettings({ ...emailSettings, staffInviteEmailTemplate: e.target.value })}
+                className="w-full bg-surface border border-white/10 rounded-lg px-4 py-2.5 text-xs font-mono text-gray-300 focus:border-primary focus:outline-none placeholder-gray-600" 
+              />
+              <p className="text-[10.5px] text-gray-500 mt-1">Available placeholders: <code className="text-primary/70">{"{{name}}, {{email}}, {{password}}, {{role}}"}</code></p>
+            </div>
+            <div className="pt-4 flex justify-end gap-3">
+              <button disabled={isSaving} type="button" onClick={() => setIsConfigOpen(false)} className="px-4 py-2 hover:bg-white/5 text-white rounded-lg transition-colors text-sm font-medium">Cancel</button>
+              <button disabled={isSaving} type="submit" className="px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-lg transition-colors text-sm font-medium flex items-center gap-2">
+                {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Settings className="w-4 h-4" />} Save Configuration
+              </button>
+            </div>
+          </form>
+        ) : (
+          <div className="flex py-12 items-center justify-center">
+             <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          </div>
+        )}
+      </Modal>
+
+      {/* ── Preview Modal Overlay ────────────────────────── */}
+      {previewTemplate && (
+          <div className="fixed z-[100] inset-0 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+            <div className="w-full max-w-2xl bg-surface rounded-2xl overflow-hidden shadow-2xl border border-white/10 flex flex-col max-h-[90vh]">
+              <div className="p-4 border-b border-white/10 flex items-center justify-between bg-white/5">
+                <h3 className="font-bold text-lg flex items-center gap-2">
+                  <Eye className="w-5 h-5 text-primary" /> Email Preview
+                </h3>
+                <button onClick={() => setPreviewTemplate(null)} className="p-1 text-gray-400 hover:text-white hover:bg-white/10 rounded transition-colors">
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+              <div className="flex-1 overflow-hidden bg-white">
+                <iframe title="Preview" className="w-full h-[600px] border-none" srcDoc={getCompiledTemplate(previewTemplate.html)} />
+              </div>
+            </div>
+          </div>
+      )}
     </div>
   );
 }

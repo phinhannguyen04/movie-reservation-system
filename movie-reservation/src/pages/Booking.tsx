@@ -9,6 +9,7 @@ import { movies, cinemas, generateShowtimes, generateSeats, type Showtime, type 
 import { api } from '@/services/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/contexts/DataContext';
+import { useMemo } from 'react';
 
 type Step = 1 | 2 | 3 | 4;
 
@@ -17,7 +18,7 @@ export function Booking() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
-  const { refreshTickets } = useData();
+  const { refreshTickets, tickets } = useData();
   
   const movie = movies.find(m => m.id === id);
 
@@ -44,6 +45,22 @@ export function Booking() {
   const showtimes = generateShowtimes(movie?.id || '', format(selectedDate, 'yyyy-MM-dd'));
 
   const now = new Date();
+
+  const bookedSeats = useMemo(() => {
+    if (!selectedShowtime || !selectedDate || !selectedCinema) return new Set<string>();
+    
+    const relevantTickets = tickets.filter(t => 
+       t.movieId === movie?.id &&
+       t.cinemaId === selectedCinema &&
+       t.status !== 'cancelled' &&
+       format(new Date(t.bookingDate), 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd') &&
+       (t.showtime === selectedShowtime.time || t.showtimeId === selectedShowtime.id)
+    );
+    
+    const seatSet = new Set<string>();
+    relevantTickets.forEach(t => t.seats?.forEach(s => seatSet.add(s.trim())));
+    return seatSet;
+  }, [tickets, movie?.id, selectedCinema, selectedDate, selectedShowtime]);
 
   // Auto-select showtime from URL params
   useEffect(() => {
@@ -76,7 +93,7 @@ export function Booking() {
   };
 
   const handleSeatClick = (seat: Seat) => {
-    if (seat.status === 'occupied') return;
+    if (seat.status === 'occupied' || bookedSeats.has(seat.id)) return;
     setSelectedSeats(prev => {
       const isSelected = prev.find(s => s.id === seat.id);
       if (isSelected) return prev.filter(s => s.id !== seat.id);
@@ -267,16 +284,17 @@ export function Booking() {
                           <span className="w-6 text-center text-xs font-bold text-gray-500">{row}</span>
                           <div className="flex gap-2">
                             {seats.filter(s => s.row === row).map(seat => {
+                              const isOccupied = seat.status === 'occupied' || bookedSeats.has(seat.id);
                               const isSelected = selectedSeats.some(s => s.id === seat.id);
                               let seatClass = "w-8 h-8 rounded-t-lg rounded-b-sm transition-all duration-200 flex items-center justify-center text-[10px] font-medium";
-                              if (seat.status === 'occupied') seatClass = cn(seatClass, "bg-seat-occupied text-transparent cursor-not-allowed opacity-50");
+                              if (isOccupied) seatClass = cn(seatClass, "bg-seat-occupied text-gray-500 cursor-not-allowed opacity-50");
                               else if (isSelected) seatClass = cn(seatClass, "bg-seat-selected text-white shadow-[0_0_10px_rgba(229,9,20,0.5)] scale-110");
                               else if (seat.type === 'vip') seatClass = cn(seatClass, "bg-seat-available border border-seat-vip/50 text-seat-vip hover:bg-seat-vip/20 cursor-pointer");
                               else if (seat.type === 'couple') seatClass = cn(seatClass, "bg-seat-available border border-seat-couple/50 text-seat-couple hover:bg-seat-couple/20 cursor-pointer w-[72px]");
                               else seatClass = cn(seatClass, "bg-seat-available border border-white/10 text-gray-400 hover:bg-white/10 cursor-pointer");
                               return (
-                                <button key={seat.id} disabled={seat.status === 'occupied'} onClick={() => handleSeatClick(seat)} className={seatClass}>
-                                  {isSelected ? seat.id : ''}
+                                <button key={seat.id} disabled={isOccupied} onClick={() => handleSeatClick(seat)} className={seatClass}>
+                                  {isSelected || isOccupied ? seat.id : ''}
                                 </button>
                               );
                             })}

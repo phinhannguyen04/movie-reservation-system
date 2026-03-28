@@ -78,27 +78,27 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   // ── Fetch all data on mount ────────────────────────────
   const refreshMovies = useCallback(async () => {
-    try { setMovies(await api.get<Movie[]>('/movies')); } catch (e) { console.error('Failed to load movies', e); }
+    try { const res: any = await api.get('/movies'); setMovies(res.items || res); } catch (e) { console.error('Failed to load movies', e); }
   }, []);
 
   const refreshCinemas = useCallback(async () => {
-    try { setCinemas(await api.get<Cinema[]>('/cinemas')); } catch (e) { console.error('Failed to load cinemas', e); }
+    try { const res: any = await api.get('/cinemas'); setCinemas(res.items || res); } catch (e) { console.error('Failed to load cinemas', e); }
   }, []);
 
   const refreshShowtimes = useCallback(async () => {
-    try { setShowtimes(await api.get<Showtime[]>('/showtimes')); } catch (e) { console.error('Failed to load showtimes', e); }
+    try { const res: any = await api.get('/showtimes'); setShowtimes(res.items || res); } catch (e) { console.error('Failed to load showtimes', e); }
   }, []);
 
   const refreshTickets = useCallback(async () => {
-    try { setTickets(await api.get<Booking[]>('/bookings')); } catch (e) { console.error('Failed to load bookings', e); }
+    try { const res: any = await api.get('/bookings'); setTickets(res.items || res); } catch (e) { console.error('Failed to load bookings', e); }
   }, []);
 
   const refreshStaff = useCallback(async () => {
-    try { setStaff(await api.get<Staff[]>('/staff')); } catch (e) { console.error('Failed to load staff', e); }
+    try { const res: any = await api.get('/staff'); setStaff(res.items || res); } catch (e) { console.error('Failed to load staff', e); }
   }, []);
 
   const refreshUsers = useCallback(async () => {
-    try { setUsers(await api.get<User[]>('/users')); } catch (e) { console.error('Failed to load users', e); }
+    try { const res: any = await api.get('/users'); setUsers(res.items || res); } catch (e) { console.error('Failed to load users', e); }
   }, []);
 
   useEffect(() => {
