@@ -44,7 +44,7 @@ public class Booking
     
     [ForeignKey("ShowtimeId")]
     public Showtime? ShowtimeRef { get; set; }
-    
-    [ForeignKey("UserId")]
+
+    // Navigation with manual relationship mapping in Fluent API
     public User? User { get; set; }
 }

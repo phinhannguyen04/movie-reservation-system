@@ -6,7 +6,7 @@ import React, {
   useCallback,
   ReactNode,
 } from "react";
-import { Movie, Cinema, Showtime, Booking } from "@/data/mock";
+import { Movie, Cinema, Showtime, Booking, Room } from "@/data/mock";
 import { api } from "@/services/api";
 
 export interface User {
@@ -14,6 +14,7 @@ export interface User {
   name: string;
   email: string;
   phone?: string;
+  avatar?: string | null;
   role: string;
   status: "active" | "inactive" | "locked";
 }
@@ -40,6 +41,8 @@ interface DataContextType {
   updateCinema: (cinema: Cinema) => Promise<void>;
   deleteCinema: (id: string) => Promise<void>;
   refreshCinemas: () => Promise<void>;
+  addRoom: (cinemaId: string, room: Omit<Room, "id" | "cinemaId">) => Promise<void>;
+  deleteRoom: (cinemaId: string, roomId: string) => Promise<void>;
 
   showtimes: Showtime[];
   setShowtimes: React.Dispatch<React.SetStateAction<Showtime[]>>;
@@ -79,7 +82,7 @@ interface DataContextType {
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
-export function DataProvider({ children }: { children: ReactNode }) {
+export function DataProvider({ children }: { children?: React.ReactNode }) {
   const [movies, setMovies] = useState<Movie[]>([]);
   const [cinemas, setCinemas] = useState<Cinema[]>([]);
   const [showtimes, setShowtimes] = useState<Showtime[]>([]);
@@ -118,7 +121,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const refreshTickets = useCallback(async () => {
     try {
-      const res: any = await api.get("/bookings");
+      const res: any = await api.get("/bookings?pageSize=1000");
       setTickets(res.items || res);
     } catch (e) {
       console.error("Failed to load bookings", e);
@@ -191,6 +194,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
   };
   const deleteCinema = async (id: string) => {
     await api.del(`/cinemas/${id}`);
+    await refreshCinemas();
+  };
+
+  const addRoom = async (cinemaId: string, room: Omit<Room, "id" | "cinemaId">) => {
+    await api.post(`/cinemas/${cinemaId}/rooms`, room);
+    await refreshCinemas();
+  };
+
+  const deleteRoom = async (cinemaId: string, roomId: string) => {
+    await api.del(`/cinemas/${cinemaId}/rooms/${roomId}`);
     await refreshCinemas();
   };
 
@@ -267,6 +280,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
         updateCinema,
         deleteCinema,
         refreshCinemas,
+        addRoom,
+        deleteRoom,
         showtimes,
         setShowtimes,
         addShowtime,

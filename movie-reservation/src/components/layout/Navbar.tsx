@@ -4,6 +4,7 @@ import { Film, Home, Ticket, User, Search, X, Calendar, LogOut, Shield } from 'l
 import { cn } from '@/lib/utils';
 import { movies } from '@/data/mock';
 import { useAuth } from '@/contexts/AuthContext';
+import { UserAvatar } from '@/components/ui/UserAvatar';
 
 export function Navbar() {
   const location = useLocation();
@@ -17,7 +18,6 @@ export function Navbar() {
     { name: 'Movies', path: '/movies', icon: Film },
     { name: 'Schedule', path: '/schedule', icon: Calendar },
     { name: 'My Tickets', path: '/tickets', icon: Ticket },
-    { name: 'Profile', path: '/profile', icon: User },
   ] : [
     { name: 'Home', path: '/', icon: Home },
     { name: 'Movies', path: '/movies', icon: Film },
@@ -143,29 +143,36 @@ export function Navbar() {
                 );
               })}
               {isAuthenticated && user?.role === 'admin' && (
-                <Link to="/admin" className="ml-4 px-3 py-1.5 bg-red-500/10 text-red-400 border border-red-500/20 rounded-lg hover:bg-red-500/20 transition-colors text-sm font-medium flex items-center gap-2">
+                <Link 
+                  to="/admin" 
+                  className={cn(
+                    "ml-4 px-4 py-2 border rounded-xl transition-all text-xs font-black uppercase tracking-widest flex items-center gap-2",
+                    location.pathname.startsWith('/admin')
+                      ? "bg-red-500 border-red-500 text-white shadow-lg shadow-red-500/20"
+                      : "bg-red-500/10 border-red-500/20 text-red-500 hover:bg-red-500/20"
+                  )}
+                >
                   <Shield className="w-4 h-4" />
-                  <span className="hidden sm:inline">Admin Panel</span>
+                  Admin Panel
                 </Link>
               )}
               {isAuthenticated && user ? (
-                <div className="flex items-center gap-2 ml-4 pl-4 border-l border-white/10">
-                  <Link 
-                    to="/profile" 
-                    className={cn(
-                      "flex items-center gap-3 px-3 py-1.5 rounded-full transition-all border",
-                      location.pathname.startsWith('/profile') 
-                        ? "bg-primary/10 border-primary/50 shadow-[0_0_15px_rgba(229,9,20,0.15)]" 
-                        : "border-transparent hover:bg-white/5"
-                    )}
-                  >
-                    <img src={user.avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${user.name}`} alt="Avatar" className="w-8 h-8 rounded-full border-2 border-primary/50 object-cover bg-surface shrink-0" />
-                    <span className="text-sm font-bold text-white hidden lg:block tracking-wide">{user.name}</span>
-                  </Link>
+                <div className="flex items-center gap-2 ml-6 pl-6 border-l border-white/10">
+                  <div className="flex items-center gap-3 pr-2">
+                    <UserAvatar 
+                      name={user.name} 
+                      avatar={user.avatar} 
+                      className="w-10 h-10 rounded-xl border border-white/10 shrink-0 object-cover shadow-lg shadow-black/20" 
+                    />
+                    <div className="flex flex-col text-left">
+                      <span className="text-sm font-black text-white tracking-tight leading-none mb-1 whitespace-nowrap">{user.name}</span>
+                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest leading-none">System User</span>
+                    </div>
+                  </div>
                   <button 
                     onClick={logout} 
-                    className="p-2 ml-1 text-gray-400 hover:text-red-400 hover:bg-red-400/10 rounded-full transition-colors"
-                    title="Log out"
+                    className="w-10 h-10 flex items-center justify-center text-gray-500 hover:text-white hover:bg-white/5 rounded-xl transition-all"
+                    title="Terminate Session"
                   >
                     <LogOut className="w-5 h-5" />
                   </button>

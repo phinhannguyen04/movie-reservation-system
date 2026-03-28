@@ -41,7 +41,15 @@ public record BookingUpdateDto(string Status);
 public record BookingResponse(
     Guid Id, Guid MovieId, Guid CinemaId, Guid ShowtimeId, Guid? UserId,
     List<string> Seats, decimal TotalPrice, DateTime BookingDate, string Status,
-    string MovieTitle, string CinemaName, string ShowtimeTime);
+    string MovieTitle, string CinemaName, string ShowtimeTime, string? UserName);
+
+public record FlexibleBookingDto(
+    string? MovieId, string? CinemaId, string? ShowtimeId,
+    List<string>? Seats, decimal TotalPrice,
+    string? MovieTitle, string? CinemaName, string? Showtime, string? Screen, string? UserId, DateTime? BookingDate);
+
+public record BookingUpdateRequestDto(string Status);
+
 
 // ── User DTOs ────────────────────────────────────────────────
 public record UserUpdateDto(string Name, string Email, string? Phone, string Role, string Status);

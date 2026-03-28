@@ -4,6 +4,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using MovieReservation.Data;
 
+AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
+
 var builder = WebApplication.CreateBuilder(args);
 
 // ── Database ─────────────────────────────────────────────────
@@ -45,8 +47,6 @@ builder.Services.AddCors(options =>
     });
 });
 
-// ── Services ─────────────────────────────────────────────────
-builder.Services.AddScoped<MovieReservation.Services.EmailService>();
 
 // ── Controllers + JSON ───────────────────────────────────────
 builder.Services.AddControllers()
