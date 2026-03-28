@@ -64,10 +64,19 @@ public class MoviesController : ControllerBase
     {
         var movie = new Movie
         {
-            Title = dto.Title, PosterUrl = dto.PosterUrl, BackdropUrl = dto.BackdropUrl,
-            Genre = dto.Genre, Duration = dto.Duration, Rating = dto.Rating,
-            ReleaseDate = dto.ReleaseDate, EndDate = dto.EndDate,
-            Synopsis = dto.Synopsis, Director = dto.Director, Cast = dto.Cast, TrailerUrl = dto.TrailerUrl
+            Title = dto.Title, 
+            PosterUrl = dto.PosterUrl, 
+            BackdropUrl = dto.BackdropUrl,
+            Genre = dto.Genre, 
+            Duration = dto.Duration, 
+            Rating = dto.Rating,
+            // Force UTC kind for Npgsql compatibility
+            ReleaseDate = DateTime.SpecifyKind(dto.ReleaseDate, DateTimeKind.Utc), 
+            EndDate = dto.EndDate.HasValue ? DateTime.SpecifyKind(dto.EndDate.Value, DateTimeKind.Utc) : null,
+            Synopsis = dto.Synopsis, 
+            Director = dto.Director, 
+            Cast = dto.Cast, 
+            TrailerUrl = dto.TrailerUrl
         };
         _db.Movies.Add(movie);
         await _db.SaveChangesAsync();
@@ -80,10 +89,18 @@ public class MoviesController : ControllerBase
         var movie = await _db.Movies.FindAsync(id);
         if (movie == null) return NotFound();
 
-        movie.Title = dto.Title; movie.PosterUrl = dto.PosterUrl; movie.BackdropUrl = dto.BackdropUrl;
-        movie.Genre = dto.Genre; movie.Duration = dto.Duration; movie.Rating = dto.Rating;
-        movie.ReleaseDate = dto.ReleaseDate; movie.EndDate = dto.EndDate;
-        movie.Synopsis = dto.Synopsis; movie.Director = dto.Director; movie.Cast = dto.Cast;
+        movie.Title = dto.Title; 
+        movie.PosterUrl = dto.PosterUrl; 
+        movie.BackdropUrl = dto.BackdropUrl;
+        movie.Genre = dto.Genre; 
+        movie.Duration = dto.Duration; 
+        movie.Rating = dto.Rating;
+        // Force UTC kind for Npgsql compatibility
+        movie.ReleaseDate = DateTime.SpecifyKind(dto.ReleaseDate, DateTimeKind.Utc);
+        movie.EndDate = dto.EndDate.HasValue ? DateTime.SpecifyKind(dto.EndDate.Value, DateTimeKind.Utc) : null;
+        movie.Synopsis = dto.Synopsis; 
+        movie.Director = dto.Director; 
+        movie.Cast = dto.Cast;
         movie.TrailerUrl = dto.TrailerUrl;
 
         await _db.SaveChangesAsync();
@@ -99,6 +116,4 @@ public class MoviesController : ControllerBase
         await _db.SaveChangesAsync();
         return NoContent();
     }
-
-
 }

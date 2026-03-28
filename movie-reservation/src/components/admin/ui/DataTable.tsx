@@ -1,10 +1,12 @@
 import React, { ReactNode } from 'react';
-import { Search, ChevronLeft, ChevronRight, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, Pencil, Trash2, Filter } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface Column<T> {
   header: string;
   accessor: keyof T;
   render?: (item: T) => ReactNode;
+  className?: string; // Optional custom styling for the column
 }
 
 interface DataTableProps<T> {
@@ -16,9 +18,13 @@ interface DataTableProps<T> {
   addLabel?: string;
   searchPlaceholder?: string;
   customFilters?: ReactNode;
+  filterButtonActive?: boolean;
+  onFilterClick?: () => void;
   itemsPerPage?: number;
   onEdit?: (item: T) => void;
   onDelete?: (item: T) => void;
+  defaultSort?: { key: keyof T; direction: 'asc' | 'desc' };
+  isLoading?: boolean;
 }
 
 export function DataTable<T extends { id: string | number }>({
@@ -28,106 +34,203 @@ export function DataTable<T extends { id: string | number }>({
   columns,
   onAdd,
   addLabel = 'Add New',
-  searchPlaceholder = 'Search...',
+  searchPlaceholder = 'Search records...',
   customFilters,
+  filterButtonActive,
+  onFilterClick,
   itemsPerPage = 10,
   onEdit,
-  onDelete
+  onDelete,
+  defaultSort,
+  isLoading = false
 }: DataTableProps<T>) {
   const [searchQuery, setSearchQuery] = React.useState('');
   const [currentPage, setCurrentPage] = React.useState(1);
+  const [sortConfig, setSortConfig] = React.useState<{ key: keyof T; direction: 'asc' | 'desc' } | null>(defaultSort || null);
 
-  // Apply search filtering across all property values
-  const filteredData = React.useMemo(() => {
+  const handleSort = (key: keyof T) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const searchedData = React.useMemo(() => {
     if (!searchQuery) return data;
     const lowerQuery = searchQuery.toLowerCase();
     return data.filter(item => {
-      // Check if any accessible string/number value in the object matches the search query
-      return Object.values(item).some(val => 
-        val && String(val).toLowerCase().includes(lowerQuery)
-      );
+      const values = Object.values(item).filter(v => typeof v === 'string' || typeof v === 'number');
+      return values.some(val => String(val).toLowerCase().includes(lowerQuery));
     });
   }, [data, searchQuery]);
 
-  // Apply pagination
-  const totalPages = Math.ceil(filteredData.length / itemsPerPage) || 1;
+  const sortedData = React.useMemo(() => {
+    if (!sortConfig) return searchedData;
+    
+    return [...searchedData].sort((a, b) => {
+      const aVal = a[sortConfig.key];
+      const bVal = b[sortConfig.key];
+      
+      if (aVal === bVal) return 0;
+      if (aVal === null || aVal === undefined) return 1;
+      if (bVal === null || bVal === undefined) return -1;
+      
+      if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [searchedData, sortConfig]);
+
+  const totalPages = Math.ceil(sortedData.length / itemsPerPage) || 1;
   const paginatedData = React.useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
-    return filteredData.slice(startIndex, startIndex + itemsPerPage);
-  }, [filteredData, currentPage, itemsPerPage]);
+    return sortedData.slice(startIndex, startIndex + itemsPerPage);
+  }, [sortedData, currentPage, itemsPerPage]);
 
-  // Reset to page 1 if search changes
   React.useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery]);
+  }, [searchQuery, data.length]);
+
   return (
-    <div className="bg-surface rounded-xl border border-white/5 overflow-hidden flex flex-col h-full">
-      <div className="p-6 border-b border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          {title && <h2 className="text-lg font-bold text-white mb-1">{title}</h2>}
-          {description && <p className="text-sm text-gray-400">{description}</p>}
-        </div>
-        <div className="flex flex-col sm:flex-row items-center gap-3">
-          {customFilters && (
-            <div className="flex items-center gap-3 mr-2">
-              {customFilters}
-            </div>
-          )}
-          <div className="relative w-full sm:w-auto">
-            <Search className="w-4 h-4 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input 
-              type="text" 
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder={searchPlaceholder}
-              className="pl-9 pr-4 py-2 bg-background border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-primary w-full sm:w-64"
-            />
+    <div className="bg-surface/50 backdrop-blur-md rounded-2xl border border-white/10 flex flex-col h-full shadow-2xl shadow-black/40 group/table transition-all duration-500">
+      {/* Table Header */}
+      <div className="p-6 border-b border-white/5 bg-gradient-to-br from-white/[0.02] to-transparent">
+        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6">
+          <div className="space-y-1">
+            {title && <h2 className="text-2xl font-display font-bold text-white tracking-tight">{title}</h2>}
+            {description && <p className="text-sm text-gray-500 font-medium">{description}</p>}
           </div>
-          {onAdd && (
-            <button 
-              onClick={onAdd}
-              className="px-4 py-2 bg-primary hover:bg-primary-hover text-white text-sm font-medium rounded-lg transition-colors whitespace-nowrap"
-            >
-              {addLabel}
-            </button>
-          )}
+          
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Search Bar - Modernized */}
+            <div className="relative group/search flex-1 min-w-[300px]">
+              <div className="absolute inset-0 bg-primary/5 rounded-xl blur-lg group-focus-within/search:bg-primary/10 transition-all opacity-0 group-focus-within/search:opacity-100" />
+              <Search className="w-4 h-4 text-gray-500 absolute left-4 top-1/2 -translate-y-1/2 group-focus-within/search:text-primary transition-colors" />
+              <input 
+                type="text" 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder={searchPlaceholder}
+                className="relative w-full pl-11 pr-4 py-3 bg-black/20 border border-white/10 rounded-xl text-sm text-white placeholder-gray-600 focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all"
+              />
+            </div>
+
+            {/* Actions & Filters */}
+            <div className="flex items-center gap-2">
+              {onFilterClick && (
+                <button 
+                  onClick={onFilterClick}
+                  className={cn(
+                    "flex items-center gap-2 px-4 py-3 rounded-xl border font-bold text-sm transition-all active:scale-95",
+                    filterButtonActive 
+                      ? "bg-primary text-white border-primary shadow-lg shadow-primary/20" 
+                      : "bg-white/5 border-white/10 text-gray-400 hover:text-white hover:border-white/20"
+                  )}
+                >
+                  <Filter className="w-4 h-4" />
+                  <span>Filters</span>
+                </button>
+              )}
+              
+              {customFilters && <div className="contents">{customFilters}</div>}
+              
+              <div className="h-8 w-[1px] bg-white/10 mx-1 hidden sm:block" />
+
+              {onAdd && (
+                <button 
+                  onClick={onAdd}
+                  className="px-6 py-3 bg-white text-black hover:bg-white/90 text-sm font-black rounded-xl transition-all shadow-xl shadow-white/5 active:scale-95 whitespace-nowrap uppercase tracking-wider"
+                >
+                  {addLabel}
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       </div>
       
-      <div className="overflow-x-auto">
-        <table className="w-full text-left text-sm whitespace-nowrap">
+      {/* Table Content */}
+      <div className="flex-1 overflow-x-auto custom-scrollbar">
+        <table className="w-full text-left text-sm whitespace-nowrap border-separate border-spacing-0">
           <thead>
-            <tr className="bg-white/5 border-b border-white/10 text-gray-400 font-medium">
-              {columns.map((col, idx) => (
-                <th key={idx} className="px-6 py-4">{col.header}</th>
-              ))}
-              <th className="px-6 py-4 text-right">Actions</th>
+            <tr className="bg-white/[0.02] text-gray-500 font-black text-[11px] uppercase tracking-[0.2em]">
+              {columns.map((col, idx) => {
+                const isSorted = sortConfig?.key === col.accessor;
+                return (
+                  <th 
+                    key={idx} 
+                    className={cn(
+                      "px-6 py-4 border-b border-white/5 cursor-pointer hover:text-white transition-colors group/header",
+                      col.className
+                    )}
+                    onClick={() => handleSort(col.accessor)}
+                  >
+                    <div className="flex items-center gap-2">
+                      {col.header}
+                      {isSorted ? (
+                        <span className="text-primary font-bold">
+                          {sortConfig?.direction === 'asc' ? '↓' : '↑'}
+                        </span>
+                      ) : (
+                        <span className="opacity-0 group-hover/header:opacity-30 transition-opacity">↓</span>
+                      )}
+                    </div>
+                  </th>
+                );
+              })}
+              <th className="px-6 py-4 border-b border-white/5 text-right">Action Control</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-white/5">
-            {paginatedData.length > 0 ? (
-              paginatedData.map((item) => (
-                <tr key={item.id} className="hover:bg-white/5 transition-colors">
+          <tbody className="relative">
+            {isLoading ? (
+              <tr>
+                <td colSpan={columns.length + 1} className="px-6 py-20 text-center">
+                   <div className="flex flex-col items-center gap-4">
+                      <div className="w-10 h-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+                      <p className="text-sm font-medium text-gray-500">Synchronizing data...</p>
+                   </div>
+                </td>
+              </tr>
+            ) : paginatedData.length > 0 ? (
+              paginatedData.map((item, rowIdx) => (
+                <tr 
+                  key={item.id} 
+                  className="group/row transition-all hover:bg-white/[0.03]"
+                >
                   {columns.map((col, idx) => (
-                    <td key={idx} className="px-6 py-4">
-                      {col.render ? col.render(item) : String(item[col.accessor])}
+                    <td 
+                      key={idx} 
+                      className={cn(
+                         "px-6 py-5 border-b border-white/[0.03] transition-colors",
+                         col.className
+                      )}
+                    >
+                      {col.render ? col.render(item) : (
+                        <span className="text-gray-300 font-medium">
+                          {String(item[col.accessor] ?? '—')}
+                        </span>
+                      )}
                     </td>
                   ))}
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-2">
+                  <td className="px-6 py-5 border-b border-white/[0.03] text-right">
+                    <div className="flex items-center justify-end gap-1 opacity-0 group-hover/row:opacity-100 transition-all translate-x-4 group-hover/row:translate-x-0">
                       {onEdit && (
-                        <button onClick={() => onEdit(item)} className="p-1.5 text-gray-400 hover:text-blue-400 rounded transition-colors bg-white/5 hover:bg-blue-400/10" title="Edit">
+                        <button 
+                          onClick={() => onEdit(item)} 
+                          className="p-2 text-gray-400 hover:text-white rounded-xl transition-all hover:bg-white/10 active:scale-90" 
+                          title="Edit Record"
+                        >
                           <Pencil className="w-4 h-4" />
                         </button>
                       )}
                       {onDelete && (
-                        <button onClick={() => onDelete(item)} className="p-1.5 text-gray-400 hover:text-red-400 rounded transition-colors bg-white/5 hover:bg-red-400/10" title="Delete">
+                        <button 
+                          onClick={() => onDelete(item)} 
+                          className="p-2 text-gray-400 hover:text-red-400 rounded-xl transition-all hover:bg-red-400/10 active:scale-90" 
+                          title="Delete Record"
+                        >
                           <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
-                      {!onEdit && !onDelete && (
-                        <button className="p-1 text-gray-400 hover:text-white rounded transition-colors" title="Options">
-                          <MoreHorizontal className="w-5 h-5" />
                         </button>
                       )}
                     </div>
@@ -136,8 +239,14 @@ export function DataTable<T extends { id: string | number }>({
               ))
             ) : (
               <tr>
-                <td colSpan={columns.length + 1} className="px-6 py-12 text-center text-gray-500">
-                  No data available.
+                <td colSpan={columns.length + 1} className="px-6 py-24 text-center">
+                  <div className="flex flex-col items-center gap-3">
+                     <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-gray-600">
+                        <Search className="w-6 h-6" />
+                     </div>
+                     <p className="font-bold text-gray-500">No matching records found</p>
+                     <p className="text-xs text-gray-600">Try adjusting your filters or search terms</p>
+                  </div>
                 </td>
               </tr>
             )}
@@ -145,26 +254,58 @@ export function DataTable<T extends { id: string | number }>({
         </table>
       </div>
 
-      {filteredData.length > 0 && (
-        <div className="p-4 border-t border-white/10 flex items-center justify-between text-sm text-gray-400">
-          <p>
-            Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredData.length)} of {filteredData.length} entries
+      {/* Pagination Footer */}
+      {!isLoading && sortedData.length > 0 && (
+        <div className="p-4 bg-white/[0.02] border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-bold uppercase tracking-widest text-gray-500">
+          <p className="flex items-center gap-2">
+            Showing <span className="text-white">{(currentPage - 1) * itemsPerPage + 1}</span> 
+            to <span className="text-white">{Math.min(currentPage * itemsPerPage, sortedData.length)}</span> 
+            of <span className="text-white">{sortedData.length}</span> entries
           </p>
-          <div className="flex items-center gap-2">
+          
+          <div className="flex items-center gap-4">
             <button 
               onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
               disabled={currentPage === 1}
-              className="p-1 hover:text-white disabled:opacity-50 transition-colors"
+              className="group flex items-center gap-2 text-gray-400 hover:text-white disabled:opacity-20 transition-all font-black"
             >
-              <ChevronLeft className="w-5 h-5" />
+              <ChevronLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
+              Previous
             </button>
-            <span className="px-2 font-medium text-white">{currentPage} / {totalPages}</span>
+            
+            <div className="flex items-center gap-1">
+               {Array.from({ length: Math.min(totalPages, 5) }).map((_, i) => {
+                 // Simple pagination logic for 5 pages
+                 let pageNum = currentPage;
+                 if (totalPages <= 5) pageNum = i + 1;
+                 else if (currentPage <= 3) pageNum = i + 1;
+                 else if (currentPage >= totalPages - 2) pageNum = totalPages - 4 + i;
+                 else pageNum = currentPage - 2 + i;
+
+                 return (
+                   <button 
+                     key={i}
+                     onClick={() => setCurrentPage(pageNum)}
+                     className={cn(
+                       "w-8 h-8 rounded-lg flex items-center justify-center transition-all",
+                       currentPage === pageNum 
+                        ? "bg-primary text-white shadow-lg shadow-primary/20" 
+                        : "text-gray-500 hover:text-white hover:bg-white/5"
+                     )}
+                   >
+                     {pageNum}
+                   </button>
+                 );
+               })}
+            </div>
+
             <button 
               onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages}
-              className="p-1 hover:text-white disabled:opacity-50 transition-colors" 
+              className="group flex items-center gap-2 text-gray-400 hover:text-white disabled:opacity-20 transition-all font-black" 
             >
-              <ChevronRight className="w-5 h-5" />
+              Next
+              <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
             </button>
           </div>
         </div>

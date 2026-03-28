@@ -63,6 +63,7 @@ export interface Booking {
   cinemaName?: string;
   showtime?: string;
   screen?: string;
+  userName?: string;
 }
 
 

@@ -59,6 +59,15 @@ public class AppDbContext : DbContext
             
             // Scalability Indices
             e.HasIndex(b => b.UserId);
+            
+            // Loose relationship mapping (No physical FK in DB)
+            // This allows UserId to store IDs from Users OR Staff
+            e.HasOne(b => b.User)
+             .WithMany(u => u.Bookings)
+             .HasForeignKey(b => b.UserId)
+             .IsRequired(false)
+             .OnDelete(DeleteBehavior.NoAction);
+
             e.HasIndex(b => b.BookingDate);
             e.HasIndex(b => new { b.MovieTitle, b.CinemaName, b.Showtime, b.Screen, b.BookingDate });
         });

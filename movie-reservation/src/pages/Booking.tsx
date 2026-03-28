@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, MapPin, Clock, CheckCircle2, Loader2 } from 'lucide-react';
+import { ChevronLeft, Calendar as CalendarIcon, MapPin, CheckCircle2 } from 'lucide-react';
 import { format, addDays } from 'date-fns';
 import { QRCodeSVG } from 'qrcode.react';
 import { cn } from '@/lib/utils';
@@ -9,7 +9,12 @@ import { movies, cinemas, generateShowtimes, generateSeats, type Showtime, type 
 import { api } from '@/services/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/contexts/DataContext';
-import { useMemo } from 'react';
+import { useToast } from '@/components/ui/Toast';
+
+// Extracted Components
+import { BookingStepIndicator } from '@/components/booking/BookingStepIndicator';
+import { SeatMap } from '@/components/booking/SeatMap';
+import { BookingSummary } from '@/components/booking/BookingSummary';
 
 type Step = 1 | 2 | 3 | 4;
 
@@ -18,38 +23,32 @@ export function Booking() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
-  const { refreshTickets, tickets } = useData();
+  const { refreshTickets } = useData();
+  const { showToast } = useToast();
   
   const movie = movies.find(m => m.id === id);
 
   const [step, setStep] = useState<Step>(1);
-  
-  const initialDateParam = searchParams.get('date');
-  const initialCinemaParam = searchParams.get('cinema');
-  const initialTimeParam = searchParams.get('time');
-
   const [selectedDate, setSelectedDate] = useState<Date>(
-    initialDateParam ? new Date(initialDateParam) : new Date()
+    searchParams.get('date') ? new Date(searchParams.get('date')!) : new Date()
   );
-  const [selectedCinema, setSelectedCinema] = useState<string | null>(initialCinemaParam);
+  const [selectedCinema, setSelectedCinema] = useState<string | null>(searchParams.get('cinema'));
   const [selectedShowtime, setSelectedShowtime] = useState<Showtime | null>(null);
-  
   const [seats, setSeats] = useState<Seat[]>([]);
   const [selectedSeats, setSelectedSeats] = useState<Seat[]>([]);
   const [occupiedSeats, setOccupiedSeats] = useState<string[]>([]);
-  
   const [bookingId, setBookingId] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [bookingError, setBookingError] = useState('');
 
-  const dates = Array.from({ length: 7 }).map((_, i) => addDays(new Date(), i));
-  const showtimes = generateShowtimes(movie?.id || '', format(selectedDate, 'yyyy-MM-dd'));
+  const dates = useMemo(() => Array.from({ length: 7 }).map((_, i) => addDays(new Date(), i)), []);
+  const showtimes = useMemo(() => generateShowtimes(id || '', format(selectedDate, 'yyyy-MM-dd')), [id, selectedDate]);
+  const bookedSeats = useMemo(() => new Set(occupiedSeats), [occupiedSeats]);
+  const totalPrice = useMemo(() => selectedSeats.reduce((sum, seat) => sum + seat.price, 0), [selectedSeats]);
 
-  const now = new Date();
-
-  // Fetch occupied seats from API when showtime is selected
+  // Fetch occupied seats
   useEffect(() => {
-    if (selectedShowtime && selectedCinema && selectedDate) {
+    if (selectedShowtime && selectedCinema && movie) {
       const fetchOccupied = async () => {
         try {
           const cinema = cinemas.find(c => c.id === selectedCinema);
@@ -61,212 +60,124 @@ export function Booking() {
         }
       };
       fetchOccupied();
-    } else {
-      setOccupiedSeats([]);
     }
-  }, [selectedShowtime, selectedCinema, selectedDate, movie.title]);
+  }, [selectedShowtime, selectedCinema, selectedDate, movie?.title]);
 
-  const bookedSeats = useMemo(() => new Set(occupiedSeats), [occupiedSeats]);
-
-  // Auto-select showtime from URL params
+  // Initial step setup
   useEffect(() => {
-    if (initialTimeParam && initialCinemaParam && showtimes.length > 0 && !selectedShowtime) {
-      const foundShowtime = showtimes.find(
-        s => s.time === initialTimeParam && s.cinemaId === initialCinemaParam
-      );
-      if (foundShowtime) {
-        setSelectedShowtime(foundShowtime);
-        setStep(2);
-      }
+    const initialTime = searchParams.get('time');
+    const initialCinema = searchParams.get('cinema');
+    if (initialTime && initialCinema && showtimes.length > 0 && !selectedShowtime) {
+      const found = showtimes.find(s => s.time === initialTime && s.cinemaId === initialCinema);
+      if (found) { setSelectedShowtime(found); setStep(2); }
     }
-  }, [initialTimeParam, initialCinemaParam, showtimes, selectedShowtime]);
+  }, [searchParams, showtimes, selectedShowtime]);
 
   useEffect(() => {
-    if (step === 2 && seats.length === 0) {
-      setSeats(generateSeats());
-    }
+    if (step === 2 && seats.length === 0) setSeats(generateSeats());
   }, [step, seats.length]);
 
-  if (!movie) {
-    return <div className="p-12 text-center">Movie not found</div>;
-  }
+  if (!movie) return <div className="p-12 text-center">Movie not found</div>;
 
-  const isShowtimePast = (showtime: Showtime): boolean => {
-    const [hours, minutes] = showtime.time.split(':').map(Number);
-    const showtimeDate = new Date(selectedDate);
-    showtimeDate.setHours(hours, minutes, 0, 0);
-    return showtimeDate < now;
+  const isShowtimePast = (st: Showtime) => {
+    const [h, m] = st.time.split(':').map(Number);
+    const stDate = new Date(selectedDate);
+    stDate.setHours(h, m, 0, 0);
+    return stDate < new Date();
   };
 
   const handleSeatClick = (seat: Seat) => {
     if (seat.status === 'occupied' || bookedSeats.has(seat.id)) return;
-    setSelectedSeats(prev => {
-      const isSelected = prev.find(s => s.id === seat.id);
-      if (isSelected) return prev.filter(s => s.id !== seat.id);
-      if (prev.length >= 8) return prev;
-      return [...prev, seat];
-    });
+    setSelectedSeats(prev => prev.some(s => s.id === seat.id) ? prev.filter(s => s.id !== seat.id) : prev.length < 8 ? [...prev, seat] : prev);
   };
 
-  const totalPrice = selectedSeats.reduce((sum, seat) => sum + seat.price, 0);
-
   const handleConfirmBooking = async () => {
-    if (!user) {
-      navigate('/login');
-      return;
-    }
-    setBookingError('');
-    setConfirming(true);
-
+    if (!user) { navigate('/login'); return; }
+    setConfirming(true); setBookingError('');
     try {
       const cinema = cinemas.find(c => c.id === selectedCinema);
-      const payload = {
-        movieId: movie.id,
-        showtimeId: selectedShowtime?.id || '',
-        cinemaId: selectedCinema || '',
-        seats: selectedSeats.map(s => s.id),
-        totalPrice,
+      const res = await api.post<{ id: string }>('/bookings', {
+        movieId: movie.id, 
+        showtimeId: selectedShowtime?.id, 
+        cinemaId: selectedCinema,
+        seats: selectedSeats.map(s => s.id), 
+        totalPrice, 
         bookingDate: selectedDate.toISOString(),
-        showtime: selectedShowtime?.time || '',
-        cinemaName: cinema?.name || '',
-        screen: selectedShowtime?.screen || '',
-        movieTitle: movie.title,
-        userId: user.id, // Ensure user id propagates to the backend
-      };
-
-      const result = await api.post<{ id: string; bookingId?: string }>(
-        '/bookings',
-        payload
-      );
-      
-      // Clear selections and refresh local occupied seats to show "Blocked" status immediately
-      setOccupiedSeats(prev => [...prev, ...selectedSeats.map(s => s.id)]);
-      setSelectedSeats([]);
-      
-      // Refresh the tickets in global state so MyTickets page is up to date
+        showtime: selectedShowtime?.time, 
+        cinemaName: cinema?.name, 
+        screen: selectedShowtime?.screen,
+        movieTitle: movie.title, 
+        userId: user.id,
+      });
+      setOccupiedSeats(p => [...p, ...selectedSeats.map(s => s.id)]);
+      setSelectedSeats([]); 
       await refreshTickets();
-
-      setBookingId(result.id || result.bookingId || `B-${Date.now()}`);
+      showToast("Booking confirmed! Enjoy your movie.", "success");
+      setBookingId(res.id); 
       setStep(4);
     } catch (err: any) {
-      setBookingError(err.message || 'Failed to confirm booking. Please try again.');
-    } finally {
-      setConfirming(false);
-    }
+      setBookingError(err.message || 'Failed to confirm booking.');
+      showToast(err.message || "Something went wrong. Please try again.", "error");
+    } finally { setConfirming(false); }
   };
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
-      {/* Header / Progress */}
       <div className="mb-8">
-        <button 
-          onClick={() => step > 1 ? setStep((step - 1) as Step) : navigate(-1)}
-          className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors mb-6"
-        >
-          <ChevronLeft className="w-5 h-5" />
-          Back
+        <button onClick={() => step > 1 ? setStep((step - 1) as Step) : navigate(-1)} className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors mb-6">
+          <ChevronLeft className="w-5 h-5" /> Back
         </button>
-        
-        <div className="flex items-center justify-between max-w-3xl mx-auto relative">
-          <div className="absolute left-0 right-0 top-1/2 h-0.5 bg-surface-light -z-10" />
-          <div 
-            className="absolute left-0 top-1/2 h-0.5 bg-primary -z-10 transition-all duration-500"
-            style={{ width: `${((step - 1) / 3) * 100}%` }}
-          />
-          {[
-            { num: 1, label: 'Showtime' }, { num: 2, label: 'Seats' },
-            { num: 3, label: 'Payment' }, { num: 4, label: 'Ticket' }
-          ].map((s) => (
-            <div key={s.num} className="flex flex-col items-center gap-2 bg-background px-2">
-              <div className={cn(
-                "w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-colors duration-300",
-                step >= s.num ? "bg-primary text-white" : "bg-surface-light text-gray-500",
-                step === s.num && "ring-4 ring-primary/20"
-              )}>
-                {step > s.num ? <CheckCircle2 className="w-5 h-5" /> : s.num}
-              </div>
-              <span className={cn("text-xs font-medium hidden sm:block", step >= s.num ? "text-white" : "text-gray-500")}>
-                {s.label}
-              </span>
-            </div>
-          ))}
-        </div>
+        <BookingStepIndicator currentStep={step} />
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-8">
-        {/* Main Content Area */}
+      <div className="flex flex-col lg:flex-row gap-8 text-white">
         <div className="flex-1">
           <AnimatePresence mode="wait">
             {step === 1 && (
-              <motion.div key="step1" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="space-y-8">
-                {/* Date Selection */}
+              <motion.div key="step1" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="space-y-12">
                 <div>
-                  <h2 className="text-xl font-display font-bold mb-4 flex items-center gap-2">
-                    <CalendarIcon className="w-5 h-5 text-primary" />Select Date
+                  <h2 className="text-2xl font-display font-bold mb-6 flex items-center gap-2 text-white">
+                    <CalendarIcon className="w-5 h-5 text-primary" /> Select Date
                   </h2>
-                  <div className="flex gap-3 overflow-x-auto pb-4 snap-x hide-scrollbar">
+                  <div className="flex gap-4 overflow-x-auto pb-4 snap-x hide-scrollbar">
                     {dates.map((date, i) => {
                       const isSelected = format(date, 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd');
                       return (
-                        <button
-                          key={i}
-                          onClick={() => { setSelectedDate(date); setSelectedShowtime(null); }}
-                          className={cn(
-                            "flex flex-col items-center justify-center min-w-[80px] p-3 rounded-xl border transition-all snap-start",
-                            isSelected
-                              ? "bg-primary border-primary text-white shadow-[0_0_15px_rgba(229,9,20,0.3)]"
-                              : "bg-surface border-white/10 text-gray-400 hover:border-white/30 hover:text-white"
-                          )}
-                        >
-                          <span className="text-xs font-medium uppercase">{format(date, 'MMM')}</span>
-                          <span className="text-2xl font-bold my-1">{format(date, 'dd')}</span>
-                          <span className="text-xs">{format(date, 'EEE')}</span>
+                        <button key={i} onClick={() => { setSelectedDate(date); setSelectedShowtime(null); }} className={cn("flex flex-col items-center justify-center min-w-[90px] p-4 rounded-2xl border transition-all snap-start", isSelected ? "bg-primary border-primary text-white shadow-xl shadow-primary/20 scale-105" : "bg-surface border-white/5 text-gray-400 hover:border-white/20 hover:text-white")}>
+                          <span className="text-[10px] font-black uppercase tracking-widest">{format(date, 'MMM')}</span>
+                          <span className="text-3xl font-black my-1">{format(date, 'dd')}</span>
+                          <span className="text-[10px] opacity-60 font-bold uppercase">{format(date, 'EEE')}</span>
                         </button>
                       );
                     })}
                   </div>
                 </div>
 
-                {/* Cinema & Showtime Selection */}
                 <div>
-                  <h2 className="text-xl font-display font-bold mb-4 flex items-center gap-2">
-                    <MapPin className="w-5 h-5 text-primary" />Select Cinema & Time
+                  <h2 className="text-2xl font-display font-bold mb-6 flex items-center gap-2 text-white">
+                    <MapPin className="w-5 h-5 text-primary" /> Select Cinema & Time
                   </h2>
-                  <div className="space-y-6">
+                  <div className="space-y-8">
                     {cinemas.map(cinema => {
                       const cinemaShowtimes = showtimes.filter(s => s.cinemaId === cinema.id);
                       if (cinemaShowtimes.length === 0) return null;
                       return (
-                        <div key={cinema.id} className="bg-surface rounded-xl p-5 border border-white/5">
-                          <div className="flex justify-between items-start mb-4">
+                        <div key={cinema.id} className="bg-surface rounded-2xl p-6 border border-white/5 shadow-2xl">
+                          <div className="flex justify-between items-start mb-6">
                             <div>
-                              <h3 className="text-lg font-bold text-white">{cinema.name}</h3>
-                              <p className="text-sm text-gray-400">{cinema.address}</p>
+                              <h3 className="text-xl font-bold text-white">{cinema.name}</h3>
+                              <p className="text-sm text-gray-500 font-medium">{cinema.address}</p>
                             </div>
-                            <span className="text-xs font-medium px-2 py-1 bg-white/5 rounded text-gray-300">{cinema.distance}</span>
+                            <span className="text-[10px] font-black px-2 py-1 bg-white/5 rounded-lg text-gray-400 border border-white/5">{cinema.distance}</span>
                           </div>
-                          <div className="flex flex-wrap gap-3">
+                          <div className="flex flex-wrap gap-4">
                             {cinemaShowtimes.map(st => {
                               const isPast = isShowtimePast(st);
                               const isSelected = selectedShowtime?.id === st.id;
                               return (
-                                <button
-                                  key={st.id}
-                                  disabled={isPast}
-                                  onClick={() => { setSelectedCinema(cinema.id); setSelectedShowtime(st); }}
-                                  title={isPast ? 'This showtime has already passed' : ''}
-                                  className={cn(
-                                    "px-4 py-2 rounded-lg border transition-all flex flex-col items-center",
-                                    isPast
-                                      ? "opacity-40 cursor-not-allowed border-white/5 bg-white/5 text-gray-600"
-                                      : isSelected
-                                        ? "bg-primary/10 border-primary text-primary"
-                                        : "bg-background border-white/10 text-gray-300 hover:border-white/30"
-                                  )}
-                                >
-                                  <span className="text-lg font-bold">{st.time}</span>
-                                  <span className="text-[10px] uppercase tracking-wider opacity-80">{st.format} • {st.screen}</span>
-                                  {isPast && <span className="text-[10px] text-red-500/70 mt-0.5">Passed</span>}
+                                <button key={st.id} disabled={isPast} onClick={() => { setSelectedCinema(cinema.id); setSelectedShowtime(st); }} className={cn("px-6 py-3 rounded-xl border transition-all flex flex-col items-center min-w-[100px]", isPast ? "opacity-30 cursor-not-allowed grayscale" : isSelected ? "bg-primary/20 border-primary text-primary" : "bg-background border-white/5 text-gray-300 hover:border-white/20 hover:scale-105")}>
+                                  <span className="text-xl font-black">{st.time}</span>
+                                  <span className="text-[10px] font-bold uppercase tracking-tight opacity-60 mt-1">{st.format} • {st.screen}</span>
                                 </button>
                               );
                             })}
@@ -280,93 +191,32 @@ export function Booking() {
             )}
 
             {step === 2 && (
-              <motion.div key="step2" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="space-y-8">
-                <div className="bg-surface rounded-xl p-6 border border-white/5 overflow-hidden">
-                  <div className="mb-12 relative">
-                    <div className="h-2 bg-gradient-to-r from-transparent via-white to-transparent opacity-50 blur-[2px] rounded-full" />
-                    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-12 bg-gradient-to-b from-white/10 to-transparent blur-xl" />
-                    <p className="text-center text-xs text-gray-500 mt-4 uppercase tracking-widest font-medium">Screen</p>
-                  </div>
-                  <div className="overflow-x-auto pb-8 hide-scrollbar">
-                    <div className="min-w-[600px] flex flex-col gap-2 items-center">
-                      {['A','B','C','D','E','F','G','H','I','J'].map(row => (
-                        <div key={row} className="flex items-center gap-2">
-                          <span className="w-6 text-center text-xs font-bold text-gray-500">{row}</span>
-                          <div className="flex gap-2">
-                            {seats.filter(s => s.row === row).map(seat => {
-                              const isOccupied = seat.status === 'occupied' || bookedSeats.has(seat.id);
-                              const isSelected = selectedSeats.some(s => s.id === seat.id);
-                              let seatClass = "w-8 h-8 rounded-t-lg rounded-b-sm transition-all duration-200 flex items-center justify-center text-[10px] font-medium";
-                              if (isOccupied) seatClass = cn(seatClass, "bg-seat-occupied text-gray-500 cursor-not-allowed opacity-50");
-                              else if (isSelected) seatClass = cn(seatClass, "bg-seat-selected text-white shadow-[0_0_10px_rgba(229,9,20,0.5)] scale-110");
-                              else if (seat.type === 'vip') seatClass = cn(seatClass, "bg-seat-available border border-seat-vip/50 text-seat-vip hover:bg-seat-vip/20 cursor-pointer");
-                              else if (seat.type === 'couple') seatClass = cn(seatClass, "bg-seat-available border border-seat-couple/50 text-seat-couple hover:bg-seat-couple/20 cursor-pointer w-[72px]");
-                              else seatClass = cn(seatClass, "bg-seat-available border border-white/10 text-gray-400 hover:bg-white/10 cursor-pointer");
-                              return (
-                                <button key={seat.id} disabled={isOccupied} onClick={() => handleSeatClick(seat)} className={seatClass}>
-                                  {isSelected || isOccupied ? seat.id : ''}
-                                </button>
-                              );
-                            })}
-                          </div>
-                          <span className="w-6 text-center text-xs font-bold text-gray-500">{row}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap justify-center gap-6 pt-6 border-t border-white/10">
-                    <div className="flex items-center gap-2"><div className="w-5 h-5 rounded-t bg-seat-available border border-white/10" /><span className="text-xs text-gray-400">Available</span></div>
-                    <div className="flex items-center gap-2"><div className="w-5 h-5 rounded-t bg-seat-selected shadow-[0_0_8px_rgba(229,9,20,0.5)]" /><span className="text-xs text-gray-400">Selected</span></div>
-                    <div className="flex items-center gap-2"><div className="w-5 h-5 rounded-t bg-seat-occupied opacity-50" /><span className="text-xs text-gray-400">Occupied</span></div>
-                    <div className="flex items-center gap-2"><div className="w-5 h-5 rounded-t bg-seat-available border border-seat-vip/50" /><span className="text-xs text-gray-400">VIP ($15)</span></div>
-                    <div className="flex items-center gap-2"><div className="w-11 h-5 rounded-t bg-seat-available border border-seat-couple/50" /><span className="text-xs text-gray-400">Couple ($25)</span></div>
-                  </div>
-                </div>
+              <motion.div key="step2" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
+                <SeatMap seats={seats} selectedSeats={selectedSeats} bookedSeats={bookedSeats} onSeatClick={handleSeatClick} />
               </motion.div>
             )}
 
             {step === 3 && (
               <motion.div key="step3" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="space-y-6">
-                <h2 className="text-2xl font-display font-bold mb-6">Payment Details</h2>
-                {bookingError && (
-                  <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm">{bookingError}</div>
-                )}
-                <div className="bg-surface rounded-xl p-6 border border-white/5">
-                  <h3 className="text-lg font-medium mb-4">Select Payment Method</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-                    <button className="p-4 rounded-lg border border-primary bg-primary/5 flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-white rounded flex items-center justify-center"><span className="text-black font-bold text-xs">CC</span></div>
-                        <span className="font-medium">Credit Card</span>
-                      </div>
-                      <div className="w-4 h-4 rounded-full border-4 border-primary bg-background" />
+                <h2 className="text-3xl font-display font-black mb-8 text-white">Secure Checkout</h2>
+                {bookingError && <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm font-bold flex items-center gap-2 shadow-lg shadow-red-500/5 transition-all animate-pulse"> {bookingError} </div>}
+                <div className="bg-surface rounded-2xl p-8 border border-white/5 shadow-2xl">
+                  <h3 className="text-sm font-black uppercase tracking-widest text-gray-500 mb-6">Payment Method</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+                    <button className="p-5 rounded-2xl border-2 border-primary bg-primary/10 flex items-center justify-between text-white transition-all transform scale-105">
+                      <div className="flex items-center gap-4"><div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-lg"><span className="text-black font-black text-xs">VISA</span></div><span className="font-bold">Credit Card</span></div>
+                      <div className="w-5 h-5 rounded-full border-4 border-primary bg-white shadow-inner" />
                     </button>
-                    <button className="p-4 rounded-lg border border-white/10 bg-background hover:border-white/30 flex items-center justify-between transition-colors">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-[#00457C] rounded flex items-center justify-center"><span className="text-white font-bold text-xs italic">Pay</span></div>
-                        <span className="font-medium">PayPal</span>
-                      </div>
-                      <div className="w-4 h-4 rounded-full border border-white/30" />
+                    <button className="p-5 rounded-2xl border border-white/5 bg-background hover:border-white/20 flex items-center justify-between text-gray-500 transition-all opacity-60">
+                      <div className="flex items-center gap-4"><div className="w-10 h-10 bg-[#00457C] rounded-lg flex items-center justify-center"><span className="text-white font-black text-xs italic">Pay</span></div><span className="font-bold">PayPal</span></div>
+                      <div className="w-5 h-5 rounded-full border border-white/20" />
                     </button>
                   </div>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm text-gray-400 mb-1">Card Number</label>
-                      <input type="text" placeholder="0000 0000 0000 0000" defaultValue="4111 1111 1111 1111" className="w-full bg-background border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-primary transition-colors" />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm text-gray-400 mb-1">Expiry Date</label>
-                        <input type="text" placeholder="MM/YY" defaultValue="12/28" className="w-full bg-background border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-primary transition-colors" />
-                      </div>
-                      <div>
-                        <label className="block text-sm text-gray-400 mb-1">CVV</label>
-                        <input type="text" placeholder="123" defaultValue="123" className="w-full bg-background border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-primary transition-colors" />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-sm text-gray-400 mb-1">Cardholder Name</label>
-                      <input type="text" placeholder="JOHN DOE" defaultValue={user?.name?.toUpperCase() || 'JOHN DOE'} className="w-full bg-background border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-primary transition-colors" />
+                  <div className="space-y-6">
+                    <div><label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Card Number</label><input type="text" defaultValue="4111 1111 1111 1111" className="w-full bg-background border border-white/5 rounded-xl px-5 py-4 text-white font-mono focus:outline-none focus:border-primary transition-all focus:ring-4 focus:ring-primary/10" /></div>
+                    <div className="grid grid-cols-2 gap-6">
+                      <div><label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Expiry Date</label><input type="text" defaultValue="12/28" className="w-full bg-background border border-white/5 rounded-xl px-5 py-4 text-white font-mono focus:outline-none focus:border-primary transition-all focus:ring-4 focus:ring-primary/10" /></div>
+                      <div><label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">CVV</label><input type="text" defaultValue="123" className="w-full bg-background border border-white/5 rounded-xl px-5 py-4 text-white font-mono focus:outline-none focus:border-primary transition-all focus:ring-4 focus:ring-primary/10" /></div>
                     </div>
                   </div>
                 </div>
@@ -374,94 +224,54 @@ export function Booking() {
             )}
 
             {step === 4 && (
-              <motion.div key="step4" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="flex flex-col items-center justify-center py-8">
-                <div className="w-16 h-16 bg-green-500/20 text-green-500 rounded-full flex items-center justify-center mb-6">
-                  <CheckCircle2 className="w-8 h-8" />
+              <motion.div key="step4" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="flex flex-col items-center justify-center py-12">
+                <div className="w-20 h-20 bg-green-500 text-white rounded-full flex items-center justify-center mb-8 shadow-2xl shadow-green-500/20">
+                  <CheckCircle2 className="w-10 h-10" />
                 </div>
-                <h2 className="text-3xl font-display font-bold mb-2 text-center">Booking Confirmed!</h2>
-                <p className="text-gray-400 text-center mb-8">Your ticket has been saved. A confirmation email will be sent if email is configured.</p>
+                <h2 className="text-4xl font-display font-black mb-3 text-white">Booking Success!</h2>
+                <p className="text-gray-500 font-medium text-center mb-12 max-w-sm">Collect your QR Code below. We've sent the receipt to your registered email.</p>
 
-                <div className="w-full max-w-sm bg-white rounded-2xl overflow-hidden shadow-2xl relative">
-                  <div className="h-32 relative">
+                <div className="w-full max-w-sm bg-white rounded-[32px] overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.5)] relative">
+                  <div className="h-40 relative">
                     <img src={movie.backdropUrl} alt={movie.title} className="w-full h-full object-cover" />
-                    <div className="absolute inset-0 bg-black/40" />
-                    <div className="absolute top-4 left-4 right-4 flex justify-between items-start">
-                      <span className="text-white font-display font-bold text-xl tracking-wider">CINEMAX</span>
-                      <span className="bg-primary text-white text-xs font-bold px-2 py-1 rounded">E-TICKET</span>
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-black/20" />
+                    <div className="absolute bottom-6 left-8 flex flex-col">
+                      <span className="text-primary-light font-black text-[10px] uppercase tracking-[0.2em] mb-1">Electronic Ticket</span>
+                      <h3 className="text-2xl font-black text-white">{movie.title}</h3>
                     </div>
                   </div>
-                  <div className="p-6 bg-white text-black relative">
-                    <div className="absolute -left-4 -top-4 w-8 h-8 bg-background rounded-full" />
-                    <div className="absolute -right-4 -top-4 w-8 h-8 bg-background rounded-full" />
-                    <div className="absolute left-4 right-4 -top-[1px] border-t-2 border-dashed border-gray-300" />
-                    <h3 className="text-2xl font-bold mb-1">{movie.title}</h3>
-                    <p className="text-sm text-gray-500 mb-6">{cinemas.find(c => c.id === selectedCinema)?.name}</p>
-                    <div className="grid grid-cols-2 gap-y-4 gap-x-2 mb-6">
-                      <div><p className="text-xs text-gray-500 uppercase">Date</p><p className="font-bold">{format(selectedDate, 'dd MMM yyyy')}</p></div>
-                      <div><p className="text-xs text-gray-500 uppercase">Time</p><p className="font-bold">{selectedShowtime?.time}</p></div>
-                      <div><p className="text-xs text-gray-500 uppercase">Screen</p><p className="font-bold">{selectedShowtime?.screen}</p></div>
-                      <div><p className="text-xs text-gray-500 uppercase">Seats</p><p className="font-bold text-primary">{selectedSeats.map(s => s.id).join(', ')}</p></div>
+                  <div className="p-8 bg-white text-black relative">
+                    <div className="absolute -left-5 -top-5 w-10 h-10 bg-background rounded-full" />
+                    <div className="absolute -right-5 -top-5 w-10 h-10 bg-background rounded-full" />
+                    <div className="absolute left-8 right-8 -top-[1px] border-t-2 border-dashed border-gray-200" />
+                    <div className="grid grid-cols-2 gap-y-6 mb-8">
+                      <div><p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-1 transition-all">Date</p><p className="font-bold text-lg">{format(selectedDate, 'dd MMM yyyy')}</p></div>
+                      <div><p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-1 transition-all">Time</p><p className="font-bold text-lg">{selectedShowtime?.time}</p></div>
+                      <div><p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-1 transition-all">Screen</p><p className="font-bold text-lg">{selectedShowtime?.screen}</p></div>
+                      <div><p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-1 transition-all text-primary">Seats</p><p className="font-bold text-lg text-primary">{selectedSeats.map(s => s.id).join(', ')}</p></div>
                     </div>
-                    <div className="flex items-center justify-between border-t border-gray-200 pt-6">
-                      <div>
-                        <p className="text-xs text-gray-500 uppercase mb-1">Booking ID</p>
-                        <p className="font-mono font-bold text-sm">{bookingId}</p>
-                      </div>
-                      <div className="p-2 bg-white border border-gray-200 rounded-lg">
-                        <QRCodeSVG value={bookingId || 'ticket'} size={64} />
-                      </div>
+                    <div className="flex items-center justify-between border-t border-gray-100 pt-8">
+                      <div><p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-1 transition-all">Ticket ID</p><p className="font-mono font-bold text-xs opacity-60">#{bookingId?.substring(0, 16).toUpperCase()}</p></div>
+                      <div className="p-3 bg-white border-2 border-gray-100 rounded-2xl shadow-sm"><QRCodeSVG value={bookingId || 'ticket'} size={72} /></div>
                     </div>
                   </div>
                 </div>
 
-                <div className="mt-8 flex gap-4">
-                  <button onClick={() => navigate('/')} className="px-6 py-3 bg-surface hover:bg-surface-light text-white font-medium rounded-lg transition-colors">Back to Home</button>
-                  <button onClick={() => navigate('/tickets')} className="px-6 py-3 bg-primary hover:bg-primary-hover text-white font-medium rounded-lg transition-colors">View My Tickets</button>
+                <div className="mt-12 flex flex-col sm:flex-row gap-4 w-full max-w-sm">
+                  <button onClick={() => navigate('/')} className="flex-1 px-8 py-4 bg-white/5 hover:bg-white/10 text-white font-bold rounded-2xl transition-all border border-white/5">Home</button>
+                  <button onClick={() => navigate('/tickets')} className="flex-1 px-8 py-4 bg-primary hover:bg-primary-hover text-white font-bold rounded-2xl transition-all shadow-xl shadow-primary/20">View Tickets</button>
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
         </div>
 
-        {/* Sidebar / Summary */}
         {step < 4 && (
-          <div className="w-full lg:w-80 shrink-0">
-            <div className="bg-surface rounded-xl p-6 border border-white/5 sticky top-24">
-              <h3 className="text-lg font-bold mb-4 border-b border-white/10 pb-4">Booking Summary</h3>
-              <div className="flex gap-4 mb-6">
-                <img src={movie.posterUrl} alt={movie.title} className="w-16 h-24 object-cover rounded-md" />
-                <div>
-                  <h4 className="font-bold text-white leading-tight mb-1">{movie.title}</h4>
-                  <p className="text-xs text-gray-400">{movie.duration} min • {movie.rating}</p>
-                </div>
-              </div>
-              <div className="space-y-4 text-sm mb-6 pb-6 border-b border-white/10">
-                <div className="flex justify-between"><span className="text-gray-400">Cinema</span><span className="font-medium text-right max-w-[150px] truncate">{selectedCinema ? cinemas.find(c => c.id === selectedCinema)?.name : '-'}</span></div>
-                <div className="flex justify-between"><span className="text-gray-400">Date</span><span className="font-medium">{format(selectedDate, 'dd MMM yyyy')}</span></div>
-                <div className="flex justify-between"><span className="text-gray-400">Time</span><span className="font-medium">{selectedShowtime ? selectedShowtime.time : '-'}</span></div>
-                <div className="flex justify-between"><span className="text-gray-400">Seats</span><span className="font-medium text-primary">{selectedSeats.length > 0 ? selectedSeats.map(s => s.id).join(', ') : '-'}</span></div>
-              </div>
-              <div className="flex justify-between items-end mb-6">
-                <span className="text-gray-400">Total Price</span>
-                <span className="text-2xl font-bold text-white">${totalPrice.toFixed(2)}</span>
-              </div>
-
-              {step === 1 && (
-                <button disabled={!selectedShowtime} onClick={() => setStep(2)} className="w-full py-3 bg-primary hover:bg-primary-hover disabled:bg-surface-light disabled:text-gray-500 disabled:cursor-not-allowed text-white font-bold rounded-lg transition-colors flex items-center justify-center gap-2">
-                  Select Seats <ChevronRight className="w-5 h-5" />
-                </button>
-              )}
-              {step === 2 && (
-                <button disabled={selectedSeats.length === 0} onClick={() => setStep(3)} className="w-full py-3 bg-primary hover:bg-primary-hover disabled:bg-surface-light disabled:text-gray-500 disabled:cursor-not-allowed text-white font-bold rounded-lg transition-colors flex items-center justify-center gap-2">
-                  Continue to Payment <ChevronRight className="w-5 h-5" />
-                </button>
-              )}
-              {step === 3 && (
-                <button onClick={handleConfirmBooking} disabled={confirming} className="w-full py-3 bg-primary hover:bg-primary-hover disabled:opacity-60 text-white font-bold rounded-lg transition-colors flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(229,9,20,0.4)]">
-                  {confirming ? <><Loader2 className="w-4 h-4 animate-spin mr-1" />Processing...</> : `Pay $${totalPrice.toFixed(2)}`}
-                </button>
-              )}
-            </div>
+          <div className="w-full lg:w-96 shrink-0">
+            <BookingSummary 
+              step={step} movie={movie} selectedCinema={selectedCinema} cinemas={cinemas} selectedDate={selectedDate} selectedShowtime={selectedShowtime} 
+              selectedSeats={selectedSeats} totalPrice={totalPrice} onNextStep={() => setStep((step + 1) as Step)} onConfirm={handleConfirmBooking} confirming={confirming} 
+            />
           </div>
         )}
       </div>
