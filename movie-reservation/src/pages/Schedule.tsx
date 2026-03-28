@@ -4,6 +4,7 @@ import { motion } from 'motion/react';
 import { Calendar as CalendarIcon, Clock, MapPin } from 'lucide-react';
 import { movies, cinemas, generateShowtimes } from '@/data/mock';
 import { cn } from '@/lib/utils';
+import { format } from 'date-fns';
 
 export function Schedule() {
   // Generate next 7 days
@@ -17,7 +18,15 @@ export function Schedule() {
 
   const [selectedDate, setSelectedDate] = useState<Date>(dates[0]);
 
-  const formattedSelectedDate = selectedDate.toISOString().split('T')[0];
+  const formattedSelectedDate = format(selectedDate, 'yyyy-MM-dd');
+  const now = new Date();
+
+  const isShowtimePast = (showtimeTime: string, date: Date): boolean => {
+    const [hours, minutes] = showtimeTime.split(':').map(Number);
+    const st = new Date(date);
+    st.setHours(hours, minutes, 0, 0);
+    return st < now;
+  };
 
   // Group showtimes by movie, then by cinema
   const scheduleData = useMemo(() => {
@@ -130,17 +139,34 @@ export function Schedule() {
                   </div>
                   
                   <div className="flex flex-wrap gap-3 ml-6">
-                    {group.showtimes.map((showtime: any) => (
-                      <Link
-                        key={showtime.id}
-                        to={`/booking/${movie.id}?date=${formattedSelectedDate}&cinema=${group.cinema.id}&time=${showtime.time}`}
-                        className="group relative overflow-hidden rounded-lg border border-white/10 bg-white/5 hover:border-primary hover:bg-primary/10 transition-all p-3 flex flex-col items-center min-w-[90px]"
-                      >
-                        <span className="text-lg font-bold text-white group-hover:text-primary transition-colors">{showtime.time}</span>
-                        <span className="text-xs text-gray-400 mt-1">{showtime.format}</span>
-                      </Link>
-                    ))}
+                    {group.showtimes.map((showtime: any) => {
+                      const past = isShowtimePast(showtime.time, selectedDate);
+                      if (past) {
+                        return (
+                          <div
+                            key={showtime.id}
+                            title="This showtime has already passed"
+                            className="relative rounded-lg border border-white/5 bg-white/5 opacity-40 cursor-not-allowed p-3 flex flex-col items-center min-w-[90px]"
+                          >
+                            <span className="text-lg font-bold text-gray-500">{showtime.time}</span>
+                            <span className="text-xs text-gray-600 mt-1">{showtime.format}</span>
+                            <span className="text-[10px] text-red-500/70 mt-0.5">Passed</span>
+                          </div>
+                        );
+                      }
+                      return (
+                        <Link
+                          key={showtime.id}
+                          to={`/booking/${movie.id}?date=${formattedSelectedDate}&cinema=${group.cinema.id}&time=${showtime.time}`}
+                          className="group relative overflow-hidden rounded-lg border border-white/10 bg-white/5 hover:border-primary hover:bg-primary/10 transition-all p-3 flex flex-col items-center min-w-[90px]"
+                        >
+                          <span className="text-lg font-bold text-white group-hover:text-primary transition-colors">{showtime.time}</span>
+                          <span className="text-xs text-gray-400 mt-1">{showtime.format}</span>
+                        </Link>
+                      );
+                    })}
                   </div>
+
                 </div>
               ))}
             </div>
