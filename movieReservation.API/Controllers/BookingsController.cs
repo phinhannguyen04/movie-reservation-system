@@ -147,6 +147,29 @@ public class BookingsController : ControllerBase
         return NoContent();
     }
 
+    [HttpGet("occupied-seats")]
+    public async Task<IActionResult> GetOccupiedSeats([FromQuery] string movieTitle, [FromQuery] string cinemaName, [FromQuery] string showtime, [FromQuery] string screen, [FromQuery] DateTime date)
+    {
+        var targetDate = date.Date;
+        var movieTitleLower = (movieTitle ?? "").Trim().ToLower();
+        var cinemaNameLower = (cinemaName ?? "").Trim().ToLower();
+        var showtimeLower   = (showtime ?? "").Trim().ToLower();
+        var screenLower     = (screen ?? "").Trim().ToLower();
+
+        var seats = await _db.Bookings
+            .Where(b => b.MovieTitle.Trim().ToLower() == movieTitleLower
+                     && b.CinemaName.Trim().ToLower() == cinemaNameLower 
+                     && b.Showtime.Trim().ToLower()   == showtimeLower 
+                     && b.Screen.Trim().ToLower()     == screenLower 
+                     && b.BookingDate.Date == targetDate
+                     && b.Status != "cancelled")
+            .SelectMany(b => b.Seats)
+            .Distinct()
+            .ToListAsync();
+
+        return Ok(seats.Select(s => s.Trim()));
+    }
+
     private static object MapToResponse(Booking b) => new
     {
         id          = b.Id,
