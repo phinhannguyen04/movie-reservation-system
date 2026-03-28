@@ -12,6 +12,7 @@ interface SearchableSelectProps {
   showAll?: boolean;
   required?: boolean;
   maxDisplay?: number; // max options to render at once (default 20)
+  disabled?: boolean;
 }
 
 export function SearchableSelect({
@@ -25,6 +26,7 @@ export function SearchableSelect({
   showAll = true,
   required = false,
   maxDisplay = 20,
+  disabled = false,
 }: SearchableSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -57,8 +59,9 @@ export function SearchableSelect({
       {name && <input type="hidden" name={name} value={value} />}
       <button
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className={`flex items-center justify-between gap-2 bg-background border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-primary px-3 py-2 w-full min-w-[160px] ${!value || value === 'all' ? 'text-gray-500' : ''}`}
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        disabled={disabled}
+        className={`flex items-center justify-between gap-2 bg-background border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-primary px-3 py-2 w-full min-w-[160px] ${!value || value === 'all' ? 'text-gray-500' : ''} ${disabled ? 'opacity-50 cursor-not-allowed bg-white/5' : ''}`}
       >
         <span className="truncate">{selectedLabel}</span>
         <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`} />

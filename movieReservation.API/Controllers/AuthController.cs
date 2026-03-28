@@ -6,7 +6,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using MovieReservation.Data;
 using MovieReservation.DTOs;
-using MovieReservation.Services;
 
 namespace MovieReservation.Controllers;
 
@@ -16,13 +15,11 @@ public class AuthController : ControllerBase
 {
     private readonly AppDbContext _db;
     private readonly IConfiguration _config;
-    private readonly EmailService _emailService;
 
-    public AuthController(AppDbContext db, IConfiguration config, EmailService emailService)
+    public AuthController(AppDbContext db, IConfiguration config)
     {
         _db = db;
         _config = config;
-        _emailService = emailService;
     }
 
     [HttpPost("login")]
@@ -69,9 +66,6 @@ public class AuthController : ControllerBase
 
         _db.Users.Add(user);
         await _db.SaveChangesAsync();
-
-        // Send welcome email with password
-        _ = _emailService.SendWelcomeEmail(user.Email, user.Name, dto.Password);
 
         var token = GenerateToken(user.Id.ToString(), user.Email, user.Role, user.Name);
         return Ok(new AuthResponse(user.Id.ToString(), token, user.Name, user.Email, user.Role, user.Avatar, new List<string>()));

@@ -1,18 +1,20 @@
 import { useState, useEffect } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
-import { motion } from 'motion/react';
-import { Star, Clock, ArrowUpDown, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
-import { movies } from '@/data/mock';
+import { useSearchParams } from 'react-router-dom';
+import { ArrowUpDown, ChevronLeft, ChevronRight, Search } from 'lucide-react';
+import { useData } from '@/contexts/DataContext';
+import { MovieCard } from '@/components/movie/MovieCard';
 
 const MOVIES_PER_PAGE = 8;
 
 export function Movies() {
+  const { movies, loading } = useData();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = searchParams.get('tab') || 'now-playing';
   
   const [activeTab, setActiveTab] = useState(initialTab);
   const [sortBy, setSortBy] = useState('newest');
   const [currentPage, setCurrentPage] = useState(1);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Sync tab state with URL
   useEffect(() => {
@@ -20,20 +22,23 @@ export function Movies() {
     setCurrentPage(1);
   }, [activeTab, setSearchParams]);
 
-  // Reset to page 1 when sorting changes
+  // Reset to page 1 when sorting or searching changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [sortBy]);
+  }, [sortBy, searchQuery]);
 
-  const currentDate = new Date('2026-03-27');
+  const currentDate = new Date();
 
   const filteredMovies = movies.filter(movie => {
     const releaseDate = new Date(movie.releaseDate);
-    if (activeTab === 'now-playing') {
-      return releaseDate <= currentDate;
-    } else {
-      return releaseDate > currentDate;
-    }
+    const matchesTab = activeTab === 'now-playing' 
+      ? releaseDate <= currentDate 
+      : releaseDate > currentDate;
+    
+    const matchesSearch = movie.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          movie.genre.some(g => g.toLowerCase().includes(searchQuery.toLowerCase()));
+
+    return matchesTab && matchesSearch;
   });
 
   const sortedMovies = [...filteredMovies].sort((a, b) => {
@@ -51,19 +56,42 @@ export function Movies() {
   const startIndex = (currentPage - 1) * MOVIES_PER_PAGE;
   const currentMovies = sortedMovies.slice(startIndex, startIndex + MOVIES_PER_PAGE);
 
+  if (loading) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 py-12 flex justify-center items-center min-h-[400px]">
+        <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
-        <h1 className="text-4xl font-display font-bold">Movies</h1>
+      <div className="flex flex-col md:flex-row md:items-center justify-between mb-12 gap-6">
+        <div>
+          <h1 className="text-4xl font-display font-bold text-white tracking-tight">Movies</h1>
+          <p className="text-gray-500 mt-2">Explore our collection of cinematic masterpieces</p>
+        </div>
         
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+          {/* Search bar */}
+          <div className="relative group">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 group-focus-within:text-primary transition-colors" />
+            <input 
+              type="text" 
+              placeholder="Search title, genre..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 pr-4 py-2 bg-surface border border-white/10 rounded-xl text-sm text-white focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all w-full sm:w-64"
+            />
+          </div>
+
           {/* Tabs */}
-          <div className="flex p-1 bg-surface border border-white/10 rounded-lg">
+          <div className="flex p-1 bg-surface border border-white/10 rounded-xl">
             <button
               onClick={() => setActiveTab('now-playing')}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                 activeTab === 'now-playing'
-                  ? 'bg-primary text-white'
+                  ? 'bg-primary text-white shadow-lg shadow-primary/20'
                   : 'text-gray-400 hover:text-white'
               }`}
             >
@@ -71,9 +99,9 @@ export function Movies() {
             </button>
             <button
               onClick={() => setActiveTab('coming-soon')}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                 activeTab === 'coming-soon'
-                  ? 'bg-primary text-white'
+                  ? 'bg-primary text-white shadow-lg shadow-primary/20'
                   : 'text-gray-400 hover:text-white'
               }`}
             >
@@ -81,115 +109,71 @@ export function Movies() {
             </button>
           </div>
 
-          <div className="flex items-center gap-2 bg-surface border border-white/10 rounded-lg px-3 py-2 w-fit">
+          <div className="flex items-center gap-2 bg-surface border border-white/10 rounded-xl px-4 py-2 w-fit">
             <ArrowUpDown className="w-4 h-4 text-gray-400" />
             <select 
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
-              className="bg-transparent text-sm text-white focus:outline-none cursor-pointer"
+              className="bg-transparent text-sm text-white focus:outline-none cursor-pointer font-medium"
             >
-              <option value="newest" className="bg-surface">Newest First</option>
-              <option value="oldest" className="bg-surface">Oldest First</option>
-              <option value="title" className="bg-surface">Title (A-Z)</option>
+              <option value="newest" className="bg-surface text-white">Newest First</option>
+              <option value="oldest" className="bg-surface text-white">Oldest First</option>
+              <option value="title" className="bg-surface text-white">Title (A-Z)</option>
             </select>
           </div>
         </div>
       </div>
       
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-        {currentMovies.map((movie, index) => (
-          <motion.div
-            key={movie.id}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: index * 0.1 }}
-            className="group relative rounded-xl overflow-hidden bg-surface"
-          >
-            <div className="block aspect-[2/3] overflow-hidden">
-              <img
-                src={movie.posterUrl}
-                alt={movie.title}
-                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-4">
-                <Link to={`/movies/${movie.id}`} className="absolute inset-0 z-10">
-                  <span className="sr-only">View {movie.title}</span>
-                </Link>
-                <h3 className="text-lg font-bold text-white mb-1 relative z-20">{movie.title}</h3>
-                <div className="flex items-center gap-2 text-xs text-gray-300 mb-3 relative z-20">
-                  {activeTab === 'now-playing' ? (
-                    <>
-                      <span className="flex items-center gap-1 text-yellow-500">
-                        <Star className="w-3 h-3 fill-current" />
-                        {movie.rating}
-                      </span>
-                      <span>•</span>
-                      <span>{movie.duration}m</span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="flex items-center gap-1 text-primary">
-                        <Calendar className="w-3 h-3" />
-                        {new Date(movie.releaseDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
-                      </span>
-                      <span>•</span>
-                      <span>{movie.genre[0]}</span>
-                    </>
-                  )}
-                </div>
-                <div className="flex flex-col gap-2 relative z-20">
-                  <Link
-                    to={`/movies/${movie.id}`}
-                    className="w-full py-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white text-center text-sm font-semibold rounded-md transition-colors"
-                  >
-                    View Details
-                  </Link>
-                  {activeTab === 'now-playing' && (
-                    <Link
-                      to={`/booking/${movie.id}`}
-                      className="w-full py-2 bg-primary text-white text-center text-sm font-semibold rounded-md hover:bg-primary-hover transition-colors"
-                    >
-                      Book Now
-                    </Link>
-                  )}
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        ))}
-      </div>
+      {currentMovies.length > 0 ? (
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 md:gap-8">
+          {currentMovies.map((movie, index) => (
+            <MovieCard 
+              key={movie.id} 
+              movie={movie} 
+              index={index} 
+              variant={activeTab === 'now-playing' ? 'playing' : 'soon'} 
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="py-20 text-center bg-white/5 rounded-3xl border border-dashed border-white/10">
+          <p className="text-gray-500 text-lg">No movies found matching your criteria.</p>
+        </div>
+      )}
 
       {/* Pagination Controls */}
       {totalPages > 1 && (
-        <div className="flex justify-center items-center gap-2 mt-12">
+        <div className="flex justify-center items-center gap-2 mt-16">
           <button
             onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
             disabled={currentPage === 1}
-            className="p-2 rounded-lg border border-white/10 bg-surface hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="p-3 rounded-xl border border-white/10 bg-surface hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
           >
-            <ChevronLeft className="w-5 h-5" />
+            <ChevronLeft className="w-5 h-5 text-white" />
           </button>
           
-          {Array.from({ length: totalPages }).map((_, i) => (
-            <button
-              key={i}
-              onClick={() => setCurrentPage(i + 1)}
-              className={`w-10 h-10 rounded-lg border transition-colors ${
-                currentPage === i + 1 
-                  ? 'bg-primary border-primary text-white font-bold' 
-                  : 'border-white/10 bg-surface hover:bg-white/5 text-gray-300'
-              }`}
-            >
-              {i + 1}
-            </button>
-          ))}
+          <div className="flex gap-2">
+            {Array.from({ length: totalPages }).map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setCurrentPage(i + 1)}
+                className={`w-11 h-11 rounded-xl border transition-all font-bold ${
+                  currentPage === i + 1 
+                    ? 'bg-primary border-primary text-white shadow-lg shadow-primary/30' 
+                    : 'border-white/10 bg-surface hover:bg-white/5 text-gray-400'
+                }`}
+              >
+                {i + 1}
+              </button>
+            ))}
+          </div>
 
           <button
             onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
             disabled={currentPage === totalPages}
-            className="p-2 rounded-lg border border-white/10 bg-surface hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="p-3 rounded-xl border border-white/10 bg-surface hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
           >
-            <ChevronRight className="w-5 h-5" />
+            <ChevronRight className="w-5 h-5 text-white" />
           </button>
         </div>
       )}

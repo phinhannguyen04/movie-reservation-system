@@ -20,8 +20,13 @@ public class ShowtimesController : ControllerBase
         
         if (movieId.HasValue) query = query.Where(s => s.MovieId == movieId.Value);
         if (cinemaId.HasValue) query = query.Where(s => s.CinemaId == cinemaId.Value);
+        
         if (!string.IsNullOrEmpty(date) && DateTime.TryParse(date, out var d))
-            query = query.Where(s => s.Date.Date == d.Date);
+        {
+            // Force UTC kind for comparison
+            var utcDate = DateTime.SpecifyKind(d.Date, DateTimeKind.Utc);
+            query = query.Where(s => s.Date.Date == utcDate);
+        }
 
         var showtimes = await query.OrderBy(s => s.Date).ThenBy(s => s.Time).ToListAsync();
         return Ok(showtimes.Select(s => new ShowtimeResponse(
@@ -42,8 +47,13 @@ public class ShowtimesController : ControllerBase
     {
         var showtime = new Showtime
         {
-            MovieId = dto.MovieId, CinemaId = dto.CinemaId,
-            Date = dto.Date, Time = dto.Time, Screen = dto.Screen, Format = dto.Format
+            MovieId = dto.MovieId, 
+            CinemaId = dto.CinemaId,
+            // Force UTC kind for Npgsql compatibility
+            Date = DateTime.SpecifyKind(dto.Date.Date, DateTimeKind.Utc), 
+            Time = dto.Time, 
+            Screen = dto.Screen, 
+            Format = dto.Format
         };
         _db.Showtimes.Add(showtime);
         await _db.SaveChangesAsync();
@@ -55,9 +65,15 @@ public class ShowtimesController : ControllerBase
     {
         var showtime = await _db.Showtimes.FindAsync(id);
         if (showtime == null) return NotFound();
-        showtime.MovieId = dto.MovieId; showtime.CinemaId = dto.CinemaId;
-        showtime.Date = dto.Date; showtime.Time = dto.Time;
-        showtime.Screen = dto.Screen; showtime.Format = dto.Format;
+        
+        showtime.MovieId = dto.MovieId; 
+        showtime.CinemaId = dto.CinemaId;
+        // Force UTC kind for Npgsql compatibility
+        showtime.Date = DateTime.SpecifyKind(dto.Date.Date, DateTimeKind.Utc);
+        showtime.Time = dto.Time;
+        showtime.Screen = dto.Screen; 
+        showtime.Format = dto.Format;
+        
         await _db.SaveChangesAsync();
         return Ok(showtime);
     }

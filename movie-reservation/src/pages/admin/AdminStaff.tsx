@@ -1,10 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { DataTable } from '@/components/admin/ui/DataTable';
 import { Modal } from '@/components/admin/ui/Modal';
+import { AdvancedFilterModal, FilterConfig } from '@/components/admin/ui/AdvancedFilterModal';
 import { useAuth } from '@/contexts/AuthContext';
-import { Shield, Check, X, UserPlus, Mail, Settings, Eye, Loader2, Search, Trash2, ArrowRight } from 'lucide-react';
+import { Shield, Check, X, UserPlus, Eye, Search, Trash2, ArrowRight, Layers, LayoutGrid, Users } from 'lucide-react';
+import { AdminHeader } from '@/components/admin/ui/AdminHeader';
 import { api } from '@/services/api';
 import { useData, User, Staff } from '@/contexts/DataContext';
+import { useDataTable } from '@/hooks/useDataTable';
+import { UserAvatar } from '@/components/ui/UserAvatar';
+import { motion, AnimatePresence } from 'motion/react';
+import { cn } from '@/lib/utils';
 
 // ── Role Permission Definitions ──────────────────────────────────
 export const SYSTEM_ROLES = [
@@ -67,67 +73,93 @@ export function AdminStaff() {
   const { user } = useAuth();
   const { staff, addStaff, updateStaff, deleteStaff, users } = useData();
 
+  const [activeTab, setActiveTab] = useState<'list' | 'roles'>('list');
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
-  const [activeTab, setActiveTab] = useState<'list' | 'roles' | 'templates'>('list');
   const [inviteEmailSearch, setInviteEmailSearch] = useState('');
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string; } | null>(null);
 
-  // ── Email Config State ──────────────────────────────────────────
-  const [emailSettings, setEmailSettings] = useState<any>(null);
-  const [previewTemplate, setPreviewTemplate] = useState<{ html: string } | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
-
-  React.useEffect(() => {
-    if (activeTab === 'templates' && !emailSettings) {
-      api.get('/settings/email').then(res => setEmailSettings(res)).catch(err => console.error(err));
-    }
-  }, [activeTab, emailSettings]);
-
-  const handleSaveConfig = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSaving(true);
-    try {
-      await api.put('/settings/email', emailSettings);
-    } catch {
-      alert("Failed to save email settings.");
-    } finally {
-      setIsSaving(false);
-    }
+  const showToast = (type: 'success' | 'error', message: string) => {
+    setToast({ type, message });
+    setTimeout(() => setToast(null), 5000);
   };
 
-  const getCompiledTemplate = (html: string) => {
-    return (html || '')
-      .replace(/{{name}}/g, 'Jane Doe')
-      .replace(/{{email}}/g, 'jane.doe@cinemax.example.com')
-      .replace(/{{password}}/g, 'tempPass123!')
-      .replace(/{{role}}/g, 'admin');
-  };
-
-  const searchResults = React.useMemo(() => {
+  // ── Invite Search Logic ──────────────────────────────────────────
+  const searchResults = useMemo(() => {
     if (!inviteEmailSearch.trim()) return [];
     const query = inviteEmailSearch.toLowerCase();
-    return users.filter(u => u.email.toLowerCase().includes(query) || u.name.toLowerCase().includes(query)).slice(0, 5);
+    return users.filter(u => 
+      u.email.toLowerCase().includes(query) || 
+      u.name.toLowerCase().includes(query)
+    ).slice(0, 5);
   }, [inviteEmailSearch, users]);
 
-  const foundUser = React.useMemo(() => {
-    if (selectedUser) return selectedUser;
-    if (!inviteEmailSearch.trim()) return null;
-    return users.find(u => u.email.toLowerCase() === inviteEmailSearch.trim().toLowerCase()) || null;
-  }, [inviteEmailSearch, users, selectedUser]);
+  // ── Unified Filter Logic ─────────────────────────────────────────
+  const filterConfig: FilterConfig = {
+    selects: [
+      {
+        id: 'role',
+        label: 'Policy Role',
+        allLabel: 'All Staff Roles',
+        options: SYSTEM_ROLES.map(r => ({ value: r.id, label: r.label }))
+      },
+      {
+        id: 'status',
+        label: 'Account State',
+        allLabel: 'All States',
+        options: [
+          { value: 'active', label: 'Active' },
+          { value: 'inactive', label: 'Inactive' },
+        ]
+      }
+    ],
+    sortOptions: [
+      { id: 'alphabetical', label: 'Name (A-Z)', sub: 'Alphabetical' },
+      { id: 'privilege_desc', label: 'Top Privilege', sub: 'Admin priority' },
+      { id: 'newest', label: 'Recently Hired', sub: 'Creation date' },
+    ]
+  };
+
+  const {
+    filters,
+    handleFilterChange,
+    resetFilters,
+    applyFilters,
+    processedData,
+    activeFiltersCount
+  } = useDataTable<Staff>({
+    initialData: staff,
+    filterLogic: (s, f) => {
+      const matchRole = !f.role || f.role === 'all' || s.role === f.role;
+      const matchStatus = !f.status || f.status === 'all' || s.status === f.status;
+      return matchRole && matchStatus;
+    },
+    sortLogic: (a, b, opt) => {
+      if (opt === 'alphabetical') return a.name.localeCompare(b.name);
+      if (opt === 'privilege_desc') {
+         const hierarchy = { admin: 3, manager: 2, staff: 1 };
+         return (hierarchy[b.role as keyof typeof hierarchy] || 0) - (hierarchy[a.role as keyof typeof hierarchy] || 0);
+      }
+      return b.id.localeCompare(a.id);
+    }
+  });
 
   // ── Invite Staff Submit ──────────────────────────────────────────
   const handleInviteSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!foundUser) return;
+    if (!selectedUser) return;
     const fd = new FormData(e.target as HTMLFormElement);
+    const roleId = fd.get('role') as string;
     addStaff({
-      name: foundUser.name,
-      email: foundUser.email,
+      name: selectedUser.name,
+      email: selectedUser.email,
       password: "password123",
-      role: fd.get('role') as string,
+      role: roleId,
     });
+    showToast('success', `Security clearance granted to ${selectedUser.name} as ${roleId}`);
     setIsInviteOpen(false);
     setInviteEmailSearch('');
     setSelectedUser(null);
@@ -146,6 +178,7 @@ export function AdminStaff() {
       status: fd.get('status') as 'active' | 'inactive',
     };
     updateStaff(updated);
+    showToast('success', 'Staff credentials updated');
     setIsEditOpen(false);
     setEditingStaff(null);
   };
@@ -157,15 +190,29 @@ export function AdminStaff() {
 
   // ── Columns ────────────────────────────────────────────────────
   const columns = [
-    { header: 'Staff Member', accessor: 'name' as const, render: (item: Staff) => <span className="font-medium text-white">{item.name}</span> },
-    { header: 'Email', accessor: 'email' as const },
+    { 
+       header: 'Personnel', 
+       accessor: 'name' as const, 
+       render: (item: Staff) => (
+         <div className="flex items-center gap-3">
+             <UserAvatar name={item.name} avatar={undefined} size="md" />
+            <div>
+               <p className="font-bold text-white group-hover/row:text-primary transition-colors">{item.name}</p>
+               <p className="text-[10px] text-gray-500 font-medium">{item.email}</p>
+            </div>
+         </div>
+       )
+    },
     {
-      header: 'Role',
+      header: 'Policy Role',
       accessor: 'role' as const,
       render: (item: Staff) => {
         const roleDef = SYSTEM_ROLES.find(r => r.id === item.role);
         return (
-          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${roleDef?.color || 'text-gray-400 bg-gray-500/10 border-gray-500/20'}`}>
+          <span className={cn(
+             "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[10px] font-black border uppercase tracking-widest",
+             roleDef?.color || 'text-gray-400 bg-gray-500/10 border-gray-500/20'
+          )}>
             <Shield className="w-3 h-3" />
             {roleDef?.label || item.role}
           </span>
@@ -173,11 +220,15 @@ export function AdminStaff() {
       },
     },
     {
-      header: 'Status',
+      header: 'Audit Status',
       accessor: 'status' as const,
       render: (item: Staff) => (
-        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border uppercase tracking-wider ${item.status === 'active' ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-gray-500/10 text-gray-400 border-gray-500/20'}`}>
-          {item.status}
+        <span className={cn(
+           "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black border uppercase tracking-widest",
+           item.status === 'active' ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-gray-500/10 text-gray-400 border-gray-500/20'
+        )}>
+           {item.status === 'active' ? <Check className="w-2.5 h-2.5" /> : <X className="w-2.5 h-2.5" />}
+           {item.status}
         </span>
       ),
     },
@@ -187,109 +238,141 @@ export function AdminStaff() {
 
   // ── RENDER ─────────────────────────────────────────────────────
   return (
-    <div className="h-[calc(100vh-8rem)] relative flex flex-col gap-6">
-      {/* Tab Bar */}
-      <div className="flex items-center gap-1 bg-surface rounded-xl border border-white/5 p-1 w-fit">
-        <button
-          onClick={() => setActiveTab('list')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'list' ? 'bg-primary text-white' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
-        >
-          Staff Members
-        </button>
-        <button
-          onClick={() => setActiveTab('roles')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${activeTab === 'roles' ? 'bg-primary text-white' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
-        >
-          <Shield className="w-4 h-4" />
-          Roles & Permissions
-        </button>
-        <button
-          onClick={() => setActiveTab('templates')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${activeTab === 'templates' ? 'bg-primary text-white' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
-        >
-          <Mail className="w-4 h-4" />
-          Email Templates
-        </button>
-      </div>
+    <div className="h-full relative flex flex-col gap-8">
+      <AdminHeader 
+        title="Command Hierarchy"
+        description="Provision and manage executive privileges for the theater network personnel. Audit staff activity and permissions."
+        category="Personnel Management"
+        icon={Users}
+        actions={
+          <div className="flex items-center gap-4 bg-surface/40 backdrop-blur-md p-1.5 rounded-2xl border border-white/5 shadow-2xl">
+            <button
+              onClick={() => setActiveTab('list')}
+              className={cn(
+                "px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all",
+                activeTab === 'list' 
+                 ? "bg-primary text-white shadow-lg shadow-primary/20" 
+                 : "text-gray-500 hover:text-white hover:bg-white/5"
+              )}
+            >
+              Staff Registry
+            </button>
+            <button
+              onClick={() => setActiveTab('roles')}
+              className={cn(
+                "px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2",
+                activeTab === 'roles' 
+                 ? "bg-primary text-white shadow-lg shadow-primary/20" 
+                 : "text-gray-500 hover:text-white hover:bg-white/5"
+              )}
+            >
+              <Shield className="w-4 h-4" />
+              Policy Matrix
+            </button>
+          </div>
+        }
+      />
 
-      {/* ── Tab: Staff List ───────────────────────────── */}
+      {/* ── Tab: Personnel Registry ───────────────────────────── */}
       {activeTab === 'list' && (
         <div className="flex-1 min-h-0">
           <DataTable
-            title="Staff & Roles Management"
-            description="Control system access for administrators and operational staff."
-            data={staff}
+            title="Operational Personnel"
+            description="Manage administrative clearance, oversee operational roles, and audit system contributors."
+            data={processedData}
             columns={columns}
             onAdd={isAdmin ? () => setIsInviteOpen(true) : undefined}
-            addLabel="Invite Staff"
-            searchPlaceholder="Search staff members..."
+            addLabel="Onboard Staff"
+            searchPlaceholder="Find personnel by identity or clearing email..."
+            onFilterClick={() => setIsFilterOpen(true)}
+            filterButtonActive={activeFiltersCount > 0}
             onEdit={isAdmin ? handleEdit : undefined}
-            onDelete={isAdmin ? (item) => deleteStaff(item.id) : undefined}
+            onDelete={isAdmin ? (item) => {
+               if(confirm(`Revoke all administrative access for ${item.name}?`)) {
+                  deleteStaff(item.id);
+                  showToast('success', 'Security principal de-registered');
+               }
+            } : undefined}
+          />
+          
+          <AdvancedFilterModal 
+            isOpen={isFilterOpen}
+            onClose={() => setIsFilterOpen(false)}
+            title="Audit Security Protocols"
+            config={filterConfig}
+            filters={filters}
+            onFilterChange={handleFilterChange}
+            onReset={resetFilters}
+            onApply={applyFilters}
           />
         </div>
       )}
 
       {/* ── Tab: Roles & Permissions Matrix ───────────────── */}
       {activeTab === 'roles' && (
-        <div className="bg-surface rounded-xl border border-white/5 overflow-hidden flex flex-col flex-1 min-h-0">
-          <div className="p-6 border-b border-white/10">
-            <h2 className="text-lg font-bold text-white mb-1">Role Permission Matrix</h2>
-            <p className="text-sm text-gray-400">Visual overview of each role's capabilities across all system modules.</p>
+        <div className="bg-surface/50 backdrop-blur-md rounded-3xl border border-white/5 overflow-hidden flex flex-col flex-1 min-h-0 shadow-2xl">
+          <div className="p-10 border-b border-white/5 bg-gradient-to-br from-white/[0.02] to-transparent">
+            <h2 className="text-3xl font-display font-black text-white tracking-tight mb-2">Policy Permission Architecture</h2>
+            <p className="text-sm text-gray-500 font-medium">Cross-functional capability matrix governing all architectural modules.</p>
           </div>
 
-          {/* Role Description Cards */}
-          <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-4 border-b border-white/10">
+          <div className="p-8 grid grid-cols-1 md:grid-cols-3 gap-6 border-b border-white/5 bg-white/[0.01]">
             {SYSTEM_ROLES.map(role => (
-              <div key={role.id} className={`rounded-xl border p-4 ${role.color}`}>
-                <div className="flex items-center gap-2 mb-2">
-                  <Shield className="w-5 h-5" />
-                  <span className="font-bold text-sm">{role.label}</span>
+              <div key={role.id} className={cn("rounded-2xl border p-6 transition-all hover:scale-[1.02]", role.color)}>
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center border border-current shadow-lg">
+                     <Shield className="w-5 h-5" />
+                  </div>
+                  <span className="font-black text-lg tracking-tight uppercase">{role.label}</span>
                 </div>
-                <p className="text-xs opacity-80">{role.description}</p>
+                <p className="text-xs font-medium leading-relaxed opacity-70">{role.description}</p>
               </div>
             ))}
           </div>
 
-          {/* Permission Table */}
-          <div className="overflow-auto flex-1">
-            <table className="w-full text-left text-sm">
+          <div className="overflow-auto flex-1 custom-scrollbar">
+            <table className="w-full text-left text-sm border-separate border-spacing-0">
               <thead>
-                <tr className="bg-white/5 border-b border-white/10 text-gray-400 font-medium">
-                  <th className="px-6 py-4 sticky left-0 bg-surface z-10">Module</th>
+                <tr className="bg-white/[0.02] border-b border-white/10 text-gray-500 font-black text-[10px] uppercase tracking-[0.2em]">
+                  <th className="px-10 py-6 sticky left-0 bg-surface z-10 border-b border-white/5">Architectural Module</th>
                   {SYSTEM_ROLES.map(role => (
-                    <th key={role.id} className="px-4 py-4 text-center" colSpan={4}>
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${role.color}`}>
+                    <th key={role.id} className="px-6 py-6 text-center border-b border-white/5" colSpan={4}>
+                      <span className={cn("inline-flex items-center gap-1 px-3 py-1 rounded-lg text-[10px] font-black border uppercase tracking-widest", role.color)}>
                         {role.label}
                       </span>
                     </th>
                   ))}
                 </tr>
-                <tr className="bg-white/[0.02] border-b border-white/10 text-gray-500 text-xs">
-                  <th className="px-6 py-2 sticky left-0 bg-surface z-10"></th>
+                <tr className="bg-white/[0.01] text-gray-600 text-[9px] font-black uppercase tracking-widest">
+                  <th className="px-10 py-3 sticky left-0 bg-surface z-10 border-b border-white/5 shrink-0 min-w-[200px]"></th>
                   {SYSTEM_ROLES.map(role => (
                     <React.Fragment key={role.id}>
-                      <th className="px-2 py-2 text-center">View</th>
-                      <th className="px-2 py-2 text-center">Add</th>
-                      <th className="px-2 py-2 text-center">Edit</th>
-                      <th className="px-2 py-2 text-center">Delete</th>
+                      <th className="px-3 py-3 text-center border-b border-white/5">Read</th>
+                      <th className="px-3 py-3 text-center border-b border-white/5">Write</th>
+                      <th className="px-3 py-3 text-center border-b border-white/5">Update</th>
+                      <th className="px-3 py-3 text-center border-b border-white/5">Revoke</th>
                     </React.Fragment>
                   ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
                 {MODULES.map(mod => (
-                  <tr key={mod} className="hover:bg-white/5 transition-colors">
-                    <td className="px-6 py-3 sticky left-0 bg-surface z-10 capitalize font-medium text-white">{mod}</td>
+                  <tr key={mod} className="group/permrow hover:bg-white/[0.03] transition-all">
+                    <td className="px-10 py-5 sticky left-0 bg-surface z-10 capitalize font-bold text-white group-hover/permrow:text-primary transition-colors border-r border-white/5">{mod}</td>
                     {SYSTEM_ROLES.map(role => {
                       const perms = PERMISSION_MATRIX[role.id]?.[mod];
                       return (
                         <React.Fragment key={role.id}>
                           {['view', 'add', 'edit', 'delete'].map(action => (
-                            <td key={action} className="px-2 py-3 text-center">
+                            <td key={action} className="px-3 py-5 text-center transition-colors">
                               {perms?.[action as keyof typeof perms] ? (
-                                <Check className="w-4 h-4 text-green-400 mx-auto" />
+                                <div className="w-6 h-6 rounded-full bg-green-500/10 flex items-center justify-center mx-auto border border-green-500/20 shadow-[0_0_10px_rgba(34,197,94,0.1)]">
+                                   <Check className="w-3 h-3 text-green-400" />
+                                </div>
                               ) : (
-                                <X className="w-4 h-4 text-red-400/40 mx-auto" />
+                                <div className="w-6 h-6 rounded-full bg-white/5 flex items-center justify-center mx-auto border border-white/5 opacity-30">
+                                   <X className="w-3 h-3 text-red-400" />
+                                </div>
                               )}
                             </td>
                           ))}
@@ -304,197 +387,127 @@ export function AdminStaff() {
         </div>
       )}
 
-      {/* ── Tab: Email Templates ──────────────────────────── */}
-      {activeTab === 'templates' && (
-        <div className="bg-surface rounded-xl border border-white/5 overflow-hidden flex flex-col flex-1 min-h-0">
-          <div className="p-6 border-b border-white/10 flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-bold text-white mb-1">Notification Email Management</h2>
-              <p className="text-sm text-gray-400">Configure the email notification sent when a user is assigned a system role.</p>
-            </div>
-            {emailSettings && (
-              <button 
-                onClick={handleSaveConfig}
-                disabled={isSaving}
-                className="px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-lg transition-colors text-sm font-medium flex items-center gap-2"
-              >
-                {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Settings className="w-4 h-4" />} 
-                Save All Changes
-              </button>
-            )}
-          </div>
-
-          {!emailSettings ? (
-            <div className="flex-1 flex items-center justify-center py-20">
-              <div className="text-center">
-                <Loader2 className="w-10 h-10 animate-spin text-primary mx-auto mb-4" />
-                <p className="text-gray-400">Loading your email configuration...</p>
-              </div>
-            </div>
-          ) : (
-            <div className="flex-1 overflow-auto flex flex-col lg:flex-row divide-y lg:divide-y-0 lg:divide-x divide-white/10">
-              {/* Editor Section */}
-              <div className="flex-1 p-6 space-y-6">
-                <div>
-                  <label className="block text-sm font-bold text-gray-400 uppercase tracking-wider mb-2">Email Subject</label>
-                  <input 
-                    type="text" 
-                    value={emailSettings.staffInviteEmailSubject || ''}
-                    onChange={e => setEmailSettings({ ...emailSettings, staffInviteEmailSubject: e.target.value })}
-                    className="w-full bg-background border border-white/10 rounded-xl px-4 py-3 text-white focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all"
-                    placeholder="e.g. You have been added as a Staff Member"
-                  />
-                </div>
-                
-                <div className="flex flex-col flex-1 min-h-[400px]">
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="block text-sm font-bold text-gray-400 uppercase tracking-wider">HTML Content Template</label>
-                  </div>
-                  <textarea 
-                    value={emailSettings.staffInviteEmailTemplate || ''}
-                    onChange={e => setEmailSettings({ ...emailSettings, staffInviteEmailTemplate: e.target.value })}
-                    className="flex-1 w-full bg-background border border-white/10 rounded-xl px-4 py-4 text-sm font-mono text-gray-300 focus:border-primary focus:outline-none resize-none"
-                    placeholder="Enter HTML template here..."
-                  />
-                  <div className="mt-3 p-3 bg-white/5 rounded-lg border border-white/5">
-                    <p className="text-[11px] text-gray-500 font-medium mb-2 flex items-center gap-1.5 uppercase tracking-wide">
-                      <Settings className="w-3 h-3" /> Dynamic Placeholders
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {['name', 'email', 'password', 'role'].map(tag => (
-                        <code key={tag} className="px-2 py-0.5 bg-primary/10 text-primary border border-primary/20 rounded text-[10px]">{"{{" + tag + "}}"}</code>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Live Preview Section */}
-              <div className="w-full lg:w-[450px] bg-black/20 overflow-hidden flex flex-col">
-                <div className="p-4 border-b border-white/10 bg-white/5 flex items-center gap-2">
-                   <Eye className="w-4 h-4 text-primary" />
-                   <span className="text-xs font-bold uppercase tracking-widest text-gray-400">Live Desktop Preview</span>
-                </div>
-                <div className="flex-1 p-4 bg-gray-100/5">
-                   <div className="w-full h-full rounded-lg border border-white/10 bg-white shadow-2xl overflow-hidden">
-                      <iframe 
-                        title="Template Preview"
-                        className="w-full h-full border-none"
-                        srcDoc={getCompiledTemplate(emailSettings.staffInviteEmailTemplate)}
-                      />
-                   </div>
-                </div>
-                <div className="p-4 text-center">
-                   <p className="text-xs text-gray-500">This is how the email will appear in most modern clients like Gmail or Outlook.</p>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
 
       {/* ── Invite Staff Modal ────────────────────────── */}
-      <Modal isOpen={isInviteOpen} onClose={() => { setIsInviteOpen(false); setSelectedUser(null); setInviteEmailSearch(''); }} title="Invite New Staff Member">
-        <form onSubmit={handleInviteSubmit} className="space-y-6">
+      <Modal isOpen={isInviteOpen} onClose={() => { setIsInviteOpen(false); setSelectedUser(null); setInviteEmailSearch(''); }} title="Promote System Principal">
+        <form onSubmit={handleInviteSubmit} className="space-y-8 py-4">
           {!selectedUser ? (
-             <div className="space-y-4">
-                <div className="flex items-start gap-3 p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl text-sm text-blue-300">
-                  <UserPlus className="w-5 h-5 flex-shrink-0 mt-0.5" />
-                  <p>Searching for an existing user to promote to staff. Once invited, they will receive an email with their credentials.</p>
+             <div className="space-y-6">
+                <div className="flex items-start gap-4 p-6 bg-primary/5 border border-primary/20 rounded-2xl text-xs text-primary font-medium leading-relaxed">
+                  <UserPlus className="w-6 h-6 flex-shrink-0 mt-0.5" />
+                  <p>Identify an existing system user to assign administrative logic. Promotion provides high-level clearance and triggers a secure notification broadcast.</p>
                 </div>
 
                 <div className="relative">
-                  <label className="block text-sm font-medium text-gray-400 mb-1.5 uppercase tracking-wider text-[11px]">Find System User</label>
+                  <label className="block text-[10px] font-black text-gray-600 uppercase tracking-[0.2em] mb-3 ml-1">Identity Lookup</label>
                   <div className="relative group">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 group-focus-within:text-primary transition-colors" />
+                    <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-600 group-focus-within:text-primary transition-colors" />
                     <input 
                       required 
                       type="text" 
                       value={inviteEmailSearch}
                       onChange={e => setInviteEmailSearch(e.target.value)}
-                      className="w-full bg-background border border-white/10 rounded-xl pl-11 pr-4 py-3 text-white focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all placeholder-gray-600" 
-                      placeholder="Search by name or email address..." 
-                      autoComplete="off"
+                      className="w-full bg-black/20 border border-white/10 rounded-2xl pl-14 pr-6 py-4 text-white font-bold focus:border-primary/50 focus:ring-4 focus:ring-primary/5 focus:outline-none transition-all placeholder-gray-700" 
+                      placeholder="Search by legal name or verified email..." 
+                      autoFocus
                     />
                   </div>
                   
-                  {inviteEmailSearch.trim() !== '' && searchResults.length > 0 && (
-                    <div className="absolute z-20 w-full mt-2 bg-surface border border-white/10 rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden max-h-60 overflow-y-auto backdrop-blur-xl">
-                      {searchResults.map(u => (
-                        <button 
-                          key={u.id}
-                          type="button"
-                          onClick={() => { setSelectedUser(u); setInviteEmailSearch(''); }}
-                          className="w-full text-left px-4 py-3 hover:bg-white/5 flex items-center justify-between transition-colors border-b border-white/5 last:border-0 group"
-                        >
-                          <div className="flex items-center gap-3">
-                            <img src={`https://api.dicebear.com/7.x/initials/svg?seed=${u.name}`} className="w-8 h-8 rounded-full border border-white/10" />
-                            <div>
-                              <p className="font-bold text-white text-sm group-hover:text-primary transition-colors">{u.name}</p>
-                              <p className="text-xs text-gray-400">{u.email}</p>
+                  <AnimatePresence>
+                  {inviteEmailSearch.trim() !== '' && (
+                    <motion.div 
+                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.95 }}
+                      className="absolute z-20 w-full mt-3 bg-surface border border-white/10 rounded-3xl shadow-[0_30px_70px_rgba(0,0,0,0.8)] overflow-hidden backdrop-blur-3xl"
+                    >
+                      {searchResults.length > 0 ? (
+                        searchResults.map(u => (
+                          <button 
+                            key={u.id}
+                            type="button"
+                            onClick={() => { setSelectedUser(u); setInviteEmailSearch(''); }}
+                            className="w-full text-left px-6 py-5 hover:bg-white/5 flex items-center justify-between transition-all border-b border-white/5 last:border-0 group"
+                          >
+                            <div className="flex items-center gap-4">
+                              <div className="w-12 h-12 rounded-2xl border border-white/10 bg-white/5 flex items-center justify-center overflow-hidden">
+                                 <img src={`https://api.dicebear.com/7.x/initials/svg?seed=${u.name}`} className="w-full h-full object-cover" />
+                              </div>
+                              <div>
+                                <p className="font-black text-white group-hover:text-primary transition-colors tracking-tight">{u.name}</p>
+                                <p className="text-xs text-gray-500 font-medium font-mono">{u.email}</p>
+                              </div>
                             </div>
-                          </div>
-                          <ArrowRight className="w-4 h-4 text-gray-600 group-hover:text-primary group-hover:translate-x-1 transition-all" />
-                        </button>
-                      ))}
-                    </div>
+                            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0">
+                               <ArrowRight className="w-5 h-5 text-primary" />
+                            </div>
+                          </button>
+                        ))
+                      ) : (
+                        <div className="p-12 text-center bg-white/[0.01]">
+                           <Search className="w-12 h-12 text-gray-800 mx-auto mb-4" />
+                           <p className="text-sm font-black text-gray-600 uppercase tracking-widest">No matching principals found</p>
+                        </div>
+                      )}
+                    </motion.div>
                   )}
-
-                  {inviteEmailSearch.trim() !== '' && searchResults.length === 0 && (
-                    <div className="p-8 text-center bg-white/[0.02] border border-dashed border-white/10 rounded-xl mt-2">
-                       <Search className="w-8 h-8 text-gray-600 mx-auto mb-2 opacity-50" />
-                       <p className="text-sm text-gray-500 font-medium">No system users found matching "{inviteEmailSearch}"</p>
-                    </div>
-                  )}
+                  </AnimatePresence>
                 </div>
              </div>
           ) : (
-            <div className="space-y-6">
-              <div className="relative p-6 rounded-2xl bg-gradient-to-br from-primary/10 to-transparent border border-primary/20 overflow-hidden">
-                <div className="relative z-10 flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <img src={`https://api.dicebear.com/7.x/initials/svg?seed=${selectedUser.name}`} className="w-16 h-16 rounded-2xl border-2 border-primary/50 shadow-xl shadow-primary/20" />
-                    <div>
-                      <p className="font-black text-xl text-white tracking-tight">{selectedUser.name}</p>
-                      <p className="text-sm text-primary/80 font-medium">{selectedUser.email}</p>
-                      <div className="flex items-center gap-1.5 mt-1 text-[11px] text-green-400 bg-green-500/10 px-2 py-0.5 rounded-full w-fit border border-green-500/20">
-                         <Check className="w-3 h-3" /> System Account Linked
-                      </div>
-                    </div>
-                  </div>
-                  <button 
-                    type="button" 
-                    onClick={() => setSelectedUser(null)}
-                    className="p-2.5 bg-white/5 hover:bg-red-500/10 text-gray-400 hover:text-red-400 rounded-xl transition-all group"
-                    title="Change User"
-                  >
-                    <Trash2 className="w-5 h-5" />
-                  </button>
-                </div>
-                {/* Decorative background circle */}
-                <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -mr-16 -mt-16 blur-3xl"></div>
-              </div>
+            <div className="space-y-8 animate-in fade-in zoom-in duration-500">
+               <div className="relative p-8 rounded-[32px] bg-gradient-to-br from-primary/20 via-primary/5 to-transparent border border-primary/20 overflow-hidden shadow-2xl">
+                 <div className="relative z-10 flex items-center justify-between">
+                   <div className="flex items-center gap-6">
+                     <div className="relative">
+                        <img src={`https://api.dicebear.com/7.x/initials/svg?seed=${selectedUser.name}`} className="w-20 h-20 rounded-3xl border-2 border-primary/50 shadow-2xl shadow-primary/30" />
+                        <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-green-500 rounded-lg border-4 border-[#0F0F12] flex items-center justify-center">
+                           <Check className="w-3 h-3 text-white font-black" />
+                        </div>
+                     </div>
+                     <div>
+                       <p className="font-black text-3xl text-white tracking-tighter uppercase">{selectedUser.name}</p>
+                       <p className="text-sm text-primary/80 font-black tracking-widest">{selectedUser.email}</p>
+                       <p className="text-[10px] text-gray-600 font-medium uppercase mt-2 tracking-[0.2em]">Verified Principal Node</p>
+                     </div>
+                   </div>
+                   <button 
+                     type="button" 
+                     onClick={() => setSelectedUser(null)}
+                     className="w-12 h-12 bg-black/20 hover:bg-red-500/20 text-gray-600 hover:text-red-400 rounded-2xl transition-all flex items-center justify-center active:scale-90"
+                   >
+                     <X className="w-6 h-6" />
+                   </button>
+                 </div>
+                 {/* Decorative background element */}
+                 <div className="absolute -top-20 -right-20 w-60 h-60 bg-primary/10 rounded-full blur-[100px]" />
+               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-400 mb-2 uppercase tracking-wider text-[11px]">System Role Assignment</label>
-                <div className="grid grid-cols-1 gap-3">
+              <div className="space-y-4">
+                <label className="block text-[10px] font-black text-gray-600 uppercase tracking-widest ml-1">Privilege Tier Selection</label>
+                <div className="grid grid-cols-1 gap-4">
                   {SYSTEM_ROLES.map(r => (
                     <label 
                       key={r.id} 
-                      className={`relative flex items-start gap-4 p-4 rounded-xl border cursor-pointer transition-all hover:bg-white/5 group ${r.id === 'admin' ? 'border-primary/20 bg-primary/5' : 'border-white/10'}`}
+                      className={cn(
+                        "relative flex items-start gap-5 p-6 rounded-3xl border-2 cursor-pointer transition-all hover:scale-[1.01] active:scale-[0.99] group",
+                        r.id === 'manager' ? 'border-primary/40 bg-primary/10 shadow-xl shadow-primary/5' : 'border-white/5 bg-white/[0.02] hover:border-white/10'
+                      )}
                     >
-                      <input 
-                        type="radio" 
-                        name="role" 
-                        value={r.id} 
-                        defaultChecked={r.id === 'staff'} 
-                        className="mt-1 w-4 h-4 accent-primary" 
-                      />
-                      <div>
-                        <div className="flex items-center gap-2 mb-0.5">
-                           <span className="font-bold text-white group-hover:text-primary transition-colors">{r.label}</span>
+                      <div className="mt-1">
+                        <input 
+                          type="radio" 
+                          name="role" 
+                          value={r.id} 
+                          defaultChecked={r.id === 'staff'} 
+                          className="w-5 h-5 accent-primary appearance-none border-2 border-white/20 rounded-full checked:bg-primary checked:border-primary transition-all cursor-pointer" 
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                           <span className="font-black text-white text-lg tracking-tight uppercase group-hover:text-primary transition-colors">{r.label}</span>
                         </div>
-                        <p className="text-xs text-gray-500 leading-relaxed">{r.description}</p>
+                        <p className="text-xs text-gray-500 font-medium leading-relaxed max-w-sm">{r.description}</p>
                       </div>
                     </label>
                   ))}
@@ -503,73 +516,93 @@ export function AdminStaff() {
             </div>
           )}
           
-          <div className="pt-4 flex justify-end gap-3 border-t border-white/5">
-            <button type="button" onClick={() => { setIsInviteOpen(false); setSelectedUser(null); setInviteEmailSearch(''); }} className="px-5 py-2.5 hover:bg-white/5 text-white rounded-xl transition-colors text-sm font-medium">Cancel</button>
+          <div className="pt-6 flex flex-col sm:flex-row gap-4 border-t border-white/5">
+            <button type="button" onClick={() => { setIsInviteOpen(false); setSelectedUser(null); setInviteEmailSearch(''); }} className="flex-1 py-4 hover:bg-white/5 text-gray-500 hover:text-white rounded-2xl transition-all text-xs font-black uppercase tracking-widest">Abort Process</button>
             <button 
               type="submit" 
               disabled={!selectedUser} 
-              className="px-6 py-2.5 bg-primary hover:bg-primary-hover shadow-lg shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl transition-all text-sm font-bold flex items-center gap-2"
+              className="flex-[2] py-4 bg-white text-black hover:bg-white/90 shadow-2xl shadow-white/5 disabled:opacity-20 rounded-2xl transition-all text-xs font-black uppercase tracking-widest flex items-center justify-center gap-3 active:scale-95"
             >
-              Confirm Role Assignment <ArrowRight className="w-4 h-4" />
+              Initialize Clearance <ArrowRight className="w-5 h-5" />
             </button>
           </div>
         </form>
       </Modal>
 
       {/* ── Edit Staff Modal ────────────────────────── */}
-      <Modal isOpen={isEditOpen} onClose={() => { setIsEditOpen(false); setEditingStaff(null); }} title="Edit Staff Member">
-        <form onSubmit={handleEditSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">Full Name</label>
-            <input name="name" required type="text" defaultValue={editingStaff?.name} className="w-full bg-background border border-white/10 rounded-lg px-4 py-2.5 text-white focus:border-primary focus:outline-none" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">Email Address</label>
-            <input name="email" required type="email" defaultValue={editingStaff?.email} className="w-full bg-background border border-white/10 rounded-lg px-4 py-2.5 text-white focus:border-primary focus:outline-none" />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">Role</label>
-              <select name="role" required defaultValue={editingStaff?.role} className="w-full bg-background border border-white/10 rounded-lg px-4 py-2.5 text-white focus:border-primary focus:outline-none">
-                {SYSTEM_ROLES.map(r => (
-                  <option key={r.id} value={r.id}>{r.label}</option>
-                ))}
-              </select>
+      <Modal isOpen={isEditOpen} onClose={() => { setIsEditOpen(false); setEditingStaff(null); }} title="Modify Clearance Profile">
+        <form onSubmit={handleEditSubmit} className="space-y-8 py-4">
+          <div className="space-y-6">
+            <div className="space-y-2">
+              <label className="block text-[10px] font-black text-gray-600 uppercase tracking-widest ml-1">Principal Name</label>
+              <input name="name" required type="text" defaultValue={editingStaff?.name} className="w-full bg-black/20 border border-white/10 rounded-2xl px-6 py-4 text-white font-bold focus:border-primary/50 focus:outline-none transition-all" />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">Status</label>
-              <select name="status" required defaultValue={editingStaff?.status} className="w-full bg-background border border-white/10 rounded-lg px-4 py-2.5 text-white focus:border-primary focus:outline-none">
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </select>
+            <div className="space-y-2">
+              <label className="block text-[10px] font-black text-gray-600 uppercase tracking-widest ml-1">Verification Email</label>
+              <input name="email" required type="email" defaultValue={editingStaff?.email} className="w-full bg-black/20 border border-white/10 rounded-2xl px-6 py-4 text-white font-bold focus:border-primary/50 focus:outline-none transition-all" />
+            </div>
+            <div className="grid grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="block text-[10px] font-black text-gray-600 uppercase tracking-widest ml-1">Privilege Tier</label>
+                <select name="role" required defaultValue={editingStaff?.role} className="w-full bg-black/20 border border-white/10 rounded-2xl px-6 py-4 text-white font-bold focus:border-primary/50 focus:outline-none transition-all appearance-none uppercase tracking-widest">
+                  {SYSTEM_ROLES.map(r => (
+                    <option key={r.id} value={r.id}>{r.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="block text-[10px] font-black text-gray-600 uppercase tracking-widest ml-1">Current Protocol Status</label>
+                <select name="status" required defaultValue={editingStaff?.status} className="w-full bg-black/20 border border-white/10 rounded-2xl px-6 py-4 text-white font-bold focus:border-primary/50 focus:outline-none transition-all appearance-none uppercase tracking-widest">
+                  <option value="active">Active Integrity</option>
+                  <option value="inactive">Suspended</option>
+                </select>
+              </div>
             </div>
           </div>
-          <div className="pt-4 flex justify-end gap-3">
-            <button type="button" onClick={() => { setIsEditOpen(false); setEditingStaff(null); }} className="px-4 py-2 hover:bg-white/5 text-white rounded-lg transition-colors text-sm font-medium">Cancel</button>
-            <button type="submit" className="px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-lg transition-colors text-sm font-medium">Save Changes</button>
+          
+          <div className="pt-6 border-t border-white/5 flex gap-4">
+            <button type="button" onClick={() => { setIsEditOpen(false); setEditingStaff(null); }} className="flex-1 py-4 hover:bg-white/5 text-gray-500 hover:text-white rounded-2xl transition-all text-xs font-black uppercase tracking-widest">Cancel</button>
+            <button type="submit" className="flex-[2] py-4 bg-white text-black hover:bg-white/90 rounded-2xl transition-all text-xs font-black uppercase tracking-widest shadow-xl shadow-white/5">Finalize Changes</button>
           </div>
         </form>
       </Modal>
 
-
-      {/* ── Preview Modal Overlay ────────────────────────── */}
-      {previewTemplate && (
-          <div className="fixed z-[100] inset-0 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-            <div className="w-full max-w-2xl bg-surface rounded-2xl overflow-hidden shadow-2xl border border-white/10 flex flex-col max-h-[90vh]">
-              <div className="p-4 border-b border-white/10 flex items-center justify-between bg-white/5">
-                <h3 className="font-bold text-lg flex items-center gap-2">
-                  <Eye className="w-5 h-5 text-primary" /> Email Preview
-                </h3>
-                <button onClick={() => setPreviewTemplate(null)} className="p-1 text-gray-400 hover:text-white hover:bg-white/10 rounded transition-colors">
-                  <X className="w-6 h-6" />
-                </button>
-              </div>
-              <div className="flex-1 overflow-hidden bg-white">
-                <iframe title="Preview" className="w-full h-[600px] border-none" srcDoc={getCompiledTemplate(previewTemplate.html)} />
-              </div>
-            </div>
-          </div>
-      )}
+      {/* Toast Notification */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className={cn(
+              "fixed bottom-10 right-10 z-[100] flex items-center gap-4 px-8 py-5 rounded-[24px] shadow-[0_20px_50px_rgba(0,0,0,0.5)] border backdrop-blur-2xl",
+              toast.type === 'success' ? 'bg-green-500/10 border-green-500/20 text-green-400' : 'bg-red-500/10 border-red-500/20 text-red-400'
+            )}
+          >
+             <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center shadow-lg", toast.type === 'success' ? 'bg-green-500/20 border border-green-500/30' : 'bg-red-500/20 border border-red-500/30')}>
+                {toast.type === 'success' ? <CheckCircle className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
+             </div>
+             <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] mb-0.5 opacity-60">System Notification</p>
+                <p className="font-bold text-sm tracking-tight">{toast.message}</p>
+             </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
+  );
+}
+
+// Minimal CheckCircle icon if not in lucide scope
+function CheckCircle(props: any) {
+  return (
+    <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+  );
+}
+
+// Minimal AlertCircle icon
+function AlertCircle(props: any) {
+  return (
+    <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
   );
 }

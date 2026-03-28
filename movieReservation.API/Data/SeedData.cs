@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using MovieReservation.Models;
 
 namespace MovieReservation.Data;
@@ -40,7 +41,7 @@ public static class SeedData
 
     public static async Task Initialize(AppDbContext context)
     {
-        // Only seed if DB is empty
+        // Only seed new core data if DB is empty
         if (context.Movies.Any()) return;
 
         // ── Movies (real data) ───────────────────────────
@@ -235,24 +236,28 @@ public static class SeedData
             new()
             {
                 MovieId = MovieInception, CinemaId = CinemaDowntown, ShowtimeId = St1, UserId = User1,
+                MovieTitle = "Inception", CinemaName = "Cinemax Downtown", Showtime = "10:00", Screen = "Screen 1",
                 Seats = new List<string> { "A1", "A2" }, TotalPrice = 24.00m,
                 BookingDate = DateTime.UtcNow.AddDays(-2), Status = "confirmed"
             },
             new()
             {
                 MovieId = MovieDarkKnight, CinemaId = CinemaMall, ShowtimeId = St3, UserId = User2,
+                MovieTitle = "The Dark Knight", CinemaName = "Cinemax Mall", Showtime = "11:00", Screen = "Hall A",
                 Seats = new List<string> { "C5", "C6", "C7" }, TotalPrice = 36.00m,
                 BookingDate = DateTime.UtcNow.AddDays(-1), Status = "confirmed"
             },
             new()
             {
                 MovieId = MovieInterstellar, CinemaId = CinemaImax, ShowtimeId = St4, UserId = User1,
+                MovieTitle = "Interstellar", CinemaName = "Cinemax IMAX Theater", Showtime = "19:00", Screen = "IMAX 1",
                 Seats = new List<string> { "D3" }, TotalPrice = 18.00m,
                 BookingDate = DateTime.UtcNow, Status = "confirmed"
             },
             new()
             {
                 MovieId = MovieInception, CinemaId = CinemaDowntown, ShowtimeId = St2, UserId = User3,
+                MovieTitle = "Inception", CinemaName = "Cinemax Downtown", Showtime = "14:30", Screen = "Screen 3",
                 Seats = new List<string> { "B4", "B5" }, TotalPrice = 32.00m,
                 BookingDate = DateTime.UtcNow.AddDays(-3), Status = "cancelled"
             },

@@ -1,19 +1,18 @@
 import { useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
-import { motion } from 'motion/react';
-import { Calendar as CalendarIcon, Clock, MapPin } from 'lucide-react';
-import { movies, cinemas, generateShowtimes } from '@/data/mock';
+import { useData } from '@/contexts/DataContext';
+import { format, addDays, startOfDay } from 'date-fns';
+import { Calendar as CalendarIcon } from 'lucide-react';
+import { DateSelector } from '@/components/movie/DateSelector';
+import { MovieScheduleCard } from '@/components/movie/MovieScheduleCard';
 import { cn } from '@/lib/utils';
-import { format } from 'date-fns';
 
 export function Schedule() {
-  // Generate next 7 days
+  const { movies, cinemas, showtimes: allShowtimes, loading } = useData();
+  
+  // Generate next 7 days (rolling)
   const dates = useMemo(() => {
-    return Array.from({ length: 7 }).map((_, i) => {
-      const d = new Date();
-      d.setDate(d.getDate() + i);
-      return d;
-    });
+    const today = startOfDay(new Date());
+    return Array.from({ length: 7 }).map((_, i) => addDays(today, i));
   }, []);
 
   const [selectedDate, setSelectedDate] = useState<Date>(dates[0]);
@@ -21,24 +20,28 @@ export function Schedule() {
   const formattedSelectedDate = format(selectedDate, 'yyyy-MM-dd');
   const now = new Date();
 
-  const isShowtimePast = (showtimeTime: string, date: Date): boolean => {
+  // Pure logic for showtime evaluation
+  const isShowtimePast = (showtimeTime: string): boolean => {
     const [hours, minutes] = showtimeTime.split(':').map(Number);
-    const st = new Date(date);
+    const st = new Date(selectedDate);
     st.setHours(hours, minutes, 0, 0);
     return st < now;
   };
 
   // Group showtimes by movie, then by cinema
   const scheduleData = useMemo(() => {
+    if (loading) return [];
+    
     const data: any[] = [];
     
     movies.forEach(movie => {
-      // Skip movies that haven't been released yet
-      if (new Date(movie.releaseDate) > new Date('2026-03-27')) {
-        return;
-      }
-
-      const showtimes = generateShowtimes(movie.id, formattedSelectedDate);
+      // Filter showtimes for this movie and selected date
+      // We handle both YYYY-MM-DD and ISO-8601 formats from API
+      const showtimes = allShowtimes.filter(s => {
+        const showtimeDate = s.date.includes('T') ? s.date.split('T')[0] : s.date;
+        return s.movieId === movie.id && showtimeDate === formattedSelectedDate;
+      });
+      
       if (showtimes.length > 0) {
         const cinemaGroups = cinemas.map(cinema => {
           const cinemaShowtimes = showtimes.filter(s => s.cinemaId === cinema.id);
@@ -58,121 +61,57 @@ export function Schedule() {
     });
     
     return data;
-  }, [formattedSelectedDate]);
+  }, [formattedSelectedDate, allShowtimes, movies, cinemas, loading]);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      <div className="flex items-center gap-3 mb-8">
-        <CalendarIcon className="w-8 h-8 text-primary" />
-        <h1 className="text-4xl font-display font-bold">Showtimes & Tickets</h1>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20">
+            <CalendarIcon className="w-6 h-6 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-4xl font-display font-black text-white tracking-tight">Showtimes</h1>
+            <p className="text-gray-500 font-medium text-sm mt-1 uppercase tracking-widest">Reserve your cinematic experience</p>
+          </div>
+        </div>
       </div>
 
-      {/* Date Selector */}
-      <div className="flex overflow-x-auto pb-4 mb-8 gap-3 scrollbar-hide">
-        {dates.map((date, index) => {
-          const isSelected = date.toDateString() === selectedDate.toDateString();
-          const dayName = index === 0 ? 'Today' : index === 1 ? 'Tomorrow' : date.toLocaleDateString('en-US', { weekday: 'short' });
-          const dayNumber = date.getDate();
-          const monthName = date.toLocaleDateString('en-US', { month: 'short' });
-
-          return (
-            <button
-              key={date.toISOString()}
-              onClick={() => setSelectedDate(date)}
-              className={cn(
-                "flex flex-col items-center justify-center min-w-[80px] p-3 rounded-xl border transition-all shrink-0",
-                isSelected 
-                  ? "bg-primary border-primary text-white" 
-                  : "bg-surface border-white/10 text-gray-400 hover:bg-white/5 hover:text-white"
-              )}
-            >
-              <span className="text-xs font-medium uppercase tracking-wider mb-1">{dayName}</span>
-              <span className="text-2xl font-bold">{dayNumber}</span>
-              <span className="text-xs">{monthName}</span>
-            </button>
-          );
-        })}
-      </div>
+      <DateSelector 
+        dates={dates} 
+        selectedDate={selectedDate} 
+        onSelect={setSelectedDate} 
+        className="mb-12"
+      />
 
       {/* Movie Schedule List */}
-      <div className="space-y-8">
-        {scheduleData.map(({ movie, cinemaGroups }, index) => (
-          <motion.div
-            key={movie.id}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: index * 0.1 }}
-            className="bg-surface border border-white/10 rounded-2xl overflow-hidden flex flex-col md:flex-row"
-          >
-            {/* Movie Info */}
-            <div className="md:w-1/4 shrink-0 bg-black/20 p-6 flex flex-col md:border-r border-white/10">
-              <Link to={`/movies/${movie.id}`} className="block aspect-[2/3] rounded-lg overflow-hidden mb-4 relative group">
-                <img 
-                  src={movie.posterUrl} 
-                  alt={movie.title} 
-                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                />
-                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                  <span className="text-white font-medium text-sm border border-white/30 px-3 py-1.5 rounded-full backdrop-blur-sm">View Details</span>
-                </div>
-              </Link>
-              <h3 className="text-xl font-bold text-white mb-2">{movie.title}</h3>
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-gray-400 mb-3">
-                <span className="border border-white/20 px-2 py-0.5 rounded text-xs">{movie.rating}</span>
-                <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {movie.duration}m</span>
-              </div>
-              <p className="text-sm text-gray-500 line-clamp-2">{movie.genre.join(', ')}</p>
-            </div>
-
-            {/* Cinemas & Showtimes */}
-            <div className="p-6 flex-1 flex flex-col gap-6">
-              {cinemaGroups.map((group: any) => (
-                <div key={group.cinema.id} className="border-b border-white/5 pb-6 last:border-0 last:pb-0">
-                  <div className="flex items-start justify-between mb-4">
-                    <div>
-                      <h4 className="text-lg font-semibold text-white flex items-center gap-2">
-                        <MapPin className="w-4 h-4 text-primary" />
-                        {group.cinema.name}
-                      </h4>
-                      <p className="text-sm text-gray-400 mt-1 ml-6">{group.cinema.address} • {group.cinema.distance}</p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex flex-wrap gap-3 ml-6">
-                    {group.showtimes.map((showtime: any) => {
-                      const past = isShowtimePast(showtime.time, selectedDate);
-                      if (past) {
-                        return (
-                          <div
-                            key={showtime.id}
-                            title="This showtime has already passed"
-                            className="relative rounded-lg border border-white/5 bg-white/5 opacity-40 cursor-not-allowed p-3 flex flex-col items-center min-w-[90px]"
-                          >
-                            <span className="text-lg font-bold text-gray-500">{showtime.time}</span>
-                            <span className="text-xs text-gray-600 mt-1">{showtime.format}</span>
-                            <span className="text-[10px] text-red-500/70 mt-0.5">Passed</span>
-                          </div>
-                        );
-                      }
-                      return (
-                        <Link
-                          key={showtime.id}
-                          to={`/booking/${movie.id}?date=${formattedSelectedDate}&cinema=${group.cinema.id}&time=${showtime.time}`}
-                          className="group relative overflow-hidden rounded-lg border border-white/10 bg-white/5 hover:border-primary hover:bg-primary/10 transition-all p-3 flex flex-col items-center min-w-[90px]"
-                        >
-                          <span className="text-lg font-bold text-white group-hover:text-primary transition-colors">{showtime.time}</span>
-                          <span className="text-xs text-gray-400 mt-1">{showtime.format}</span>
-                        </Link>
-                      );
-                    })}
-                  </div>
-
-                </div>
-              ))}
-            </div>
-          </motion.div>
-        ))}
+      <div className="space-y-10">
+        {loading ? (
+          <div className="flex justify-center py-24">
+             <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : scheduleData.length > 0 ? (
+          scheduleData.map(({ movie, cinemaGroups }, index) => (
+            <MovieScheduleCard 
+              key={movie.id}
+              movie={movie}
+              cinemaGroups={cinemaGroups}
+              index={index}
+              formattedSelectedDate={formattedSelectedDate}
+              isShowtimePast={isShowtimePast}
+            />
+          ))
+        ) : (
+          <div className="py-24 flex flex-col items-center justify-center bg-surface border border-white/5 rounded-3xl">
+             <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center mb-6">
+                <CalendarIcon className="w-8 h-8 text-gray-700 opacity-20" />
+             </div>
+             <h3 className="text-xl font-bold text-gray-400">No screenings available for this date</h3>
+             <p className="text-sm text-gray-600 mt-2">Try selecting another date on the calendar above</p>
+          </div>
+        )}
       </div>
     </div>
   );
 }
+

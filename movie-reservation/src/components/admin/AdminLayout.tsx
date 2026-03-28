@@ -25,10 +25,30 @@ export function AdminLayout() {
   const navigate = useNavigate();
 
   const filteredLinks = sidebarLinks.filter(link => {
-    if (link.path === '/admin') return user?.permissions?.includes('dashboard');
+    if (!user?.permissions) return false;
+    if (link.path === '/admin') return user.permissions.includes('dashboard');
     const requiredPermission = link.path.split('/').pop() || '';
-    return user?.permissions?.includes(requiredPermission);
+    return user.permissions.includes(requiredPermission);
   });
+
+  // Authentication & Authorization Guard
+  if (!user || !['admin', 'manager', 'staff'].includes(user.role)) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-20 h-20 rounded-3xl bg-red-500/10 border border-red-500/20 flex items-center justify-center mb-6">
+          <Shield className="w-10 h-10 text-red-500" />
+        </div>
+        <h1 className="text-3xl font-display font-black text-white mb-2 uppercase tracking-tighter">Access Denied</h1>
+        <p className="text-gray-500 max-w-sm mb-8 font-medium">Your current identity lacks the cryptographic clearance required for this administrative node.</p>
+        <button 
+          onClick={() => navigate('/login')}
+          className="px-8 py-4 bg-white text-black rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-white/90 transition-all shadow-xl shadow-white/5 active:scale-95"
+        >
+          Authenticate Identity
+        </button>
+      </div>
+    );
+  }
 
   const handleLogout = () => {
     logout();
@@ -36,8 +56,7 @@ export function AdminLayout() {
   };
 
   return (
-    <DataProvider>
-      <div className="min-h-screen bg-background text-white flex">
+    <div className="min-h-screen bg-background text-white flex">
         {/* Mobile Sidebar Overlay */}
         {isMobileOpen && (
           <div 
@@ -140,7 +159,6 @@ export function AdminLayout() {
           <Outlet />
         </main>
         </div>
-      </div>
-    </DataProvider>
+    </div>
   );
 }
