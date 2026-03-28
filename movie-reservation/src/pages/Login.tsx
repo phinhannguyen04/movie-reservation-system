@@ -1,22 +1,28 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { Mail, Lock, ArrowRight } from 'lucide-react';
+import { Mail, Lock, ArrowRight, Eye, EyeOff, AlertCircle, CheckCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 export function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { login } = useAuth();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
+    setLoading(true);
     const success = await login(email, password);
+    setLoading(false);
     if (success) {
       navigate('/');
     } else {
-      alert('Login failed. Please check your credentials or ensure the API is running.');
+      setError('Login failed. Please check your credentials or ensure the API is running.');
     }
   };
 
@@ -31,6 +37,13 @@ export function Login() {
           <h1 className="text-3xl font-display font-bold mb-2">Welcome Back</h1>
           <p className="text-gray-400">Sign in to book your favorite movies</p>
         </div>
+
+        {error && (
+          <div className="flex items-start gap-3 p-4 mb-6 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm">
+            <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+            <span>{error}</span>
+          </div>
+        )}
 
         <form onSubmit={handleLogin} className="space-y-6">
           <div className="space-y-2">
@@ -62,22 +75,30 @@ export function Login() {
                 <Lock className="h-5 w-5 text-gray-500" />
               </div>
               <input
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="block w-full pl-10 pr-3 py-3 border border-white/10 rounded-xl bg-background text-white focus:ring-primary focus:border-primary transition-colors"
+                className="block w-full pl-10 pr-10 py-3 border border-white/10 rounded-xl bg-background text-white focus:ring-primary focus:border-primary transition-colors"
                 placeholder="••••••••"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-gray-300 transition-colors"
+              >
+                {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+              </button>
             </div>
           </div>
 
           <button
             type="submit"
-            className="w-full flex items-center justify-center gap-2 bg-primary hover:bg-primary-hover text-white font-medium py-3 px-4 rounded-xl transition-colors"
+            disabled={loading}
+            className="w-full flex items-center justify-center gap-2 bg-primary hover:bg-primary-hover text-white font-medium py-3 px-4 rounded-xl transition-colors disabled:opacity-60"
           >
-            Sign In
-            <ArrowRight className="w-5 h-5" />
+            {loading ? 'Signing in...' : 'Sign In'}
+            {!loading && <ArrowRight className="w-5 h-5" />}
           </button>
         </form>
 

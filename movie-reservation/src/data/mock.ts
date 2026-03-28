@@ -57,7 +57,13 @@ export interface Booking {
   totalPrice: number;
   bookingDate: string;
   status: 'confirmed' | 'cancelled' | 'watched';
+  // Denormalised fields from API
+  movieTitle?: string;
+  cinemaName?: string;
+  showtime?: string;
+  screen?: string;
 }
+
 
 export const movies: Movie[] = [
   {

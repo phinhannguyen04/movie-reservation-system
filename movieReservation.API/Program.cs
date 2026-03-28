@@ -104,6 +104,13 @@ using (var scope = app.Services.CreateScope())
             ALTER TABLE ""SystemSettings"" ADD COLUMN IF NOT EXISTS ""WelcomeEmailTemplate"" TEXT;
             ALTER TABLE ""SystemSettings"" ADD COLUMN IF NOT EXISTS ""BookingEmailSubject"" TEXT;
             ALTER TABLE ""SystemSettings"" ADD COLUMN IF NOT EXISTS ""BookingEmailTemplate"" TEXT;
+            ALTER TABLE ""Bookings"" ADD COLUMN IF NOT EXISTS ""MovieTitle"" TEXT NOT NULL DEFAULT '';
+            ALTER TABLE ""Bookings"" ADD COLUMN IF NOT EXISTS ""CinemaName"" TEXT NOT NULL DEFAULT '';
+            ALTER TABLE ""Bookings"" ADD COLUMN IF NOT EXISTS ""Showtime"" TEXT NOT NULL DEFAULT '';
+            ALTER TABLE ""Bookings"" ADD COLUMN IF NOT EXISTS ""Screen"" TEXT NOT NULL DEFAULT '';
+            ALTER TABLE ""Bookings"" ALTER COLUMN ""MovieId"" DROP NOT NULL;
+            ALTER TABLE ""Bookings"" ALTER COLUMN ""CinemaId"" DROP NOT NULL;
+            ALTER TABLE ""Bookings"" ALTER COLUMN ""ShowtimeId"" DROP NOT NULL;
         ";
         await command.ExecuteNonQueryAsync();
     }
