@@ -35,4 +35,7 @@ public class SystemSettings
 
     public string BookingEmailSubject { get; set; } = "Booking Confirmed!";
     public string BookingEmailTemplate { get; set; } = ""; // Will be seeded with default HTML
+
+    public string StaffInviteEmailSubject { get; set; } = "Staff Invitation";
+    public string StaffInviteEmailTemplate { get; set; } = ""; // Will be seeded with default HTML
 }

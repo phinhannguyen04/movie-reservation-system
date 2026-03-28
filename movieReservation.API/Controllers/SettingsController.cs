@@ -39,7 +39,9 @@ public class SettingsController : ControllerBase
             welcomeEmailSubject = settings.WelcomeEmailSubject,
             welcomeEmailTemplate = settings.WelcomeEmailTemplate,
             bookingEmailSubject = settings.BookingEmailSubject,
-            bookingEmailTemplate = settings.BookingEmailTemplate
+            bookingEmailTemplate = settings.BookingEmailTemplate,
+            staffInviteEmailSubject = settings.StaffInviteEmailSubject,
+            staffInviteEmailTemplate = settings.StaffInviteEmailTemplate
         });
     }
 
@@ -63,11 +65,12 @@ public class SettingsController : ControllerBase
         settings.FromName = dto.FromName;
         settings.EnableSsl = dto.EnableSsl;
         settings.EmailEnabled = dto.EmailEnabled;
-        
         settings.WelcomeEmailSubject = dto.WelcomeEmailSubject;
         settings.WelcomeEmailTemplate = dto.WelcomeEmailTemplate;
         settings.BookingEmailSubject = dto.BookingEmailSubject;
         settings.BookingEmailTemplate = dto.BookingEmailTemplate;
+        settings.StaffInviteEmailSubject = dto.StaffInviteEmailSubject;
+        settings.StaffInviteEmailTemplate = dto.StaffInviteEmailTemplate;
 
         await _db.SaveChangesAsync();
         return Ok(new { message = "Email settings updated successfully." });
@@ -100,7 +103,8 @@ public record EmailSettingsDto(
     string SmtpHost, int SmtpPort, string SmtpUsername, string SmtpPassword,
     string FromEmail, string FromName, bool EnableSsl, bool EmailEnabled,
     string WelcomeEmailSubject, string WelcomeEmailTemplate, 
-    string BookingEmailSubject, string BookingEmailTemplate);
+    string BookingEmailSubject, string BookingEmailTemplate,
+    string StaffInviteEmailSubject, string StaffInviteEmailTemplate);
 
 public record TestEmailDto(string Email);
 
