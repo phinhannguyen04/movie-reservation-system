@@ -4,6 +4,7 @@ import { Bell, Ticket, Star, Info, CheckCircle2, Trash2, Check, Loader2 } from '
 import { useData } from '@/contexts/DataContext';
 import { movies } from '@/data/mock';
 import { format, formatDistanceToNow } from 'date-fns';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface Notification {
   id: string;
@@ -44,12 +45,14 @@ const systemNotifications: Notification[] = [
 
 export function Notifications() {
   const { tickets, loading } = useData();
+  const { user } = useAuth();
   const [localNotifications, setLocalNotifications] = useState<Notification[]>([]);
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
 
   // Build notifications from real booking data + system notifications
   useEffect(() => {
     const bookingNotifs: Notification[] = tickets
+      .filter(b => b.userId === user?.id)
       .slice()
       .sort((a, b) => new Date(b.bookingDate).getTime() - new Date(a.bookingDate).getTime())
       .slice(0, 10) // Only last 10
@@ -96,7 +99,7 @@ export function Notifications() {
       });
     
     setLocalNotifications([...bookingNotifs, ...systemNotifications]);
-  }, [tickets]);
+  }, [tickets, user?.id]);
 
   const handleMarkAllAsRead = () => {
     setLocalNotifications(prev => prev.map(n => ({ ...n, read: true })));

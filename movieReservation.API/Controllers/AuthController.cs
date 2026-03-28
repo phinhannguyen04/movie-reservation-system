@@ -34,7 +34,7 @@ public class AuthController : ControllerBase
         {
             var permissions = GetPermissions(staff.Role);
             var token = GenerateToken(staff.Id.ToString(), staff.Email, staff.Role, staff.Name);
-            return Ok(new AuthResponse(token, staff.Name, staff.Email, staff.Role, staff.Avatar, permissions));
+            return Ok(new AuthResponse(staff.Id.ToString(), token, staff.Name, staff.Email, staff.Role, staff.Avatar, permissions));
         }
 
         // Check user
@@ -45,7 +45,7 @@ public class AuthController : ControllerBase
                 return BadRequest(new { message = "Account is locked. Contact admin." });
 
             var token = GenerateToken(user.Id.ToString(), user.Email, user.Role, user.Name);
-            return Ok(new AuthResponse(token, user.Name, user.Email, user.Role, user.Avatar, new List<string>()));
+            return Ok(new AuthResponse(user.Id.ToString(), token, user.Name, user.Email, user.Role, user.Avatar, new List<string>()));
         }
 
         return Unauthorized(new { message = "Invalid email or password." });
@@ -74,7 +74,7 @@ public class AuthController : ControllerBase
         _ = _emailService.SendWelcomeEmail(user.Email, user.Name, dto.Password);
 
         var token = GenerateToken(user.Id.ToString(), user.Email, user.Role, user.Name);
-        return Ok(new AuthResponse(token, user.Name, user.Email, user.Role, user.Avatar, new List<string>()));
+        return Ok(new AuthResponse(user.Id.ToString(), token, user.Name, user.Email, user.Role, user.Avatar, new List<string>()));
     }
 
     private string GenerateToken(string id, string email, string role, string name)

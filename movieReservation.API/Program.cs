@@ -91,33 +91,10 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    await db.Database.EnsureCreatedAsync();
-
-    // ── Self-healing Schema Update (for existing DBs) ────────
-    try
-    {
-        var connection = db.Database.GetDbConnection();
-        await connection.OpenAsync();
-        using var command = connection.CreateCommand();
-        command.CommandText = @"
-            ALTER TABLE ""SystemSettings"" ADD COLUMN IF NOT EXISTS ""WelcomeEmailSubject"" TEXT;
-            ALTER TABLE ""SystemSettings"" ADD COLUMN IF NOT EXISTS ""WelcomeEmailTemplate"" TEXT;
-            ALTER TABLE ""SystemSettings"" ADD COLUMN IF NOT EXISTS ""BookingEmailSubject"" TEXT;
-            ALTER TABLE ""SystemSettings"" ADD COLUMN IF NOT EXISTS ""BookingEmailTemplate"" TEXT;
-            ALTER TABLE ""Bookings"" ADD COLUMN IF NOT EXISTS ""MovieTitle"" TEXT NOT NULL DEFAULT '';
-            ALTER TABLE ""Bookings"" ADD COLUMN IF NOT EXISTS ""CinemaName"" TEXT NOT NULL DEFAULT '';
-            ALTER TABLE ""Bookings"" ADD COLUMN IF NOT EXISTS ""Showtime"" TEXT NOT NULL DEFAULT '';
-            ALTER TABLE ""Bookings"" ADD COLUMN IF NOT EXISTS ""Screen"" TEXT NOT NULL DEFAULT '';
-            ALTER TABLE ""Bookings"" ALTER COLUMN ""MovieId"" DROP NOT NULL;
-            ALTER TABLE ""Bookings"" ALTER COLUMN ""CinemaId"" DROP NOT NULL;
-            ALTER TABLE ""Bookings"" ALTER COLUMN ""ShowtimeId"" DROP NOT NULL;
-        ";
-        await command.ExecuteNonQueryAsync();
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"Schema sync warning: {ex.Message}");
-    }
+    
+    // For Production: Use Migrate to apply all pending changes
+    // For Development/First Run: This also creates the DB if it doesn't exist
+    await db.Database.MigrateAsync();
 
     await SeedData.Initialize(db);
 }

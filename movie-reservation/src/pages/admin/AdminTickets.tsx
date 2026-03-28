@@ -27,17 +27,17 @@ export function AdminTickets() {
     { 
       header: 'Movie', 
       accessor: 'movieId' as Extract<keyof Booking, string>,
-      render: (item: Booking) => <span className="font-bold text-white">{movies.find(m => m.id === item.movieId)?.title || item.movieId}</span>
+      render: (item: Booking) => <span className="font-bold text-white">{item.movieTitle || movies.find(m => m.id === item.movieId)?.title || item.movieId}</span>
     },
     { 
       header: 'Cinema', 
       accessor: 'cinemaId' as Extract<keyof Booking, string>,
-      render: (item: Booking) => <span className="text-gray-300">{cinemas.find(c => c.id === item.cinemaId)?.name || item.cinemaId}</span>
+      render: (item: Booking) => <span className="text-gray-300">{item.cinemaName || cinemas.find(c => c.id === item.cinemaId)?.name || item.cinemaId}</span>
     },
     { 
       header: 'Time', 
       accessor: 'showtimeId' as Extract<keyof Booking, string>,
-      render: (item: Booking) => <span className="text-gray-300">{showtimes.find(s => s.id === item.showtimeId)?.time || item.showtimeId}</span>
+      render: (item: Booking) => <span className="text-gray-300">{item.showtime || showtimes.find(s => s.id === item.showtimeId)?.time || item.showtimeId}</span>
     },
     { 
       header: 'Seats', 

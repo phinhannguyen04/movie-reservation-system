@@ -53,10 +53,11 @@ export interface Booking {
   movieId: string;
   cinemaId: string;
   showtimeId: string;
+  userId?: string;
   seats: string[];
   totalPrice: number;
   bookingDate: string;
-  status: 'confirmed' | 'cancelled' | 'watched';
+  status: 'pending' | 'confirmed' | 'cancelled' | 'watched';
   // Denormalised fields from API
   movieTitle?: string;
   cinemaName?: string;
