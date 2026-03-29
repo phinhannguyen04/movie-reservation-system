@@ -7,8 +7,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/contexts/DataContext';
 import { useDataTable } from '@/hooks/useDataTable';
 import { SearchableSelect } from '@/components/admin/ui/SearchableSelect';
-import { AdminHeader } from '@/components/admin/ui/AdminHeader';
-import { Calendar, Clock, MonitorPlay, CheckCircle, AlertCircle, Trash2, LayoutGrid, Plus } from 'lucide-react';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { Calendar, Clock, MonitorPlay, CheckCircle, AlertCircle, Plus } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/lib/utils';
 
@@ -195,11 +195,11 @@ export function AdminShowtimes() {
 
   return (
     <div className="h-full relative flex flex-col gap-8">
-      <AdminHeader 
-        title="Showtime Protocol"
-        description="Synchronize movie screenings across theatrical nodes and manage spatial availability."
-        category="Logistics"
-        icon={MonitorPlay}
+      <PageHeader 
+        title="Screening Schedule"
+        description="Orchestrate movie screenings across the theater network and monitor room utilization."
+        category="Operations"
+        icon={Calendar}
         actions={
           canCrud ? (
             <button 
@@ -210,9 +210,9 @@ export function AdminShowtimes() {
                 setFormScreen(''); 
                 setIsModalOpen(true); 
               }}
-              className="px-6 py-4 bg-white text-black hover:bg-white/90 rounded-2xl transition-all text-xs font-black uppercase tracking-widest shadow-xl shadow-white/5 flex items-center gap-2 active:scale-90"
+              className="px-6 py-4 bg-white text-black hover:bg-white/90 rounded-2xl transition-all text-xs font-black uppercase tracking-widest shadow-xl shadow-white/5 flex items-center gap-2 active:scale-95"
             >
-              <Plus className="w-4 h-4" /> Initialize Screening
+              <Plus className="w-4 h-4" /> Schedule Session
             </button>
           ) : undefined
         }

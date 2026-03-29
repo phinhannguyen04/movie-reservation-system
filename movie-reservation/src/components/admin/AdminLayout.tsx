@@ -1,164 +1,107 @@
 import { useState } from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { Outlet, useNavigate, Link } from 'react-router-dom';
 import { 
-  LayoutDashboard, Film, MonitorPlay, Calendar, 
-  Ticket, Users, Shield, Settings, LogOut, Menu, X, Eye 
+  Film, ShieldAlert, Menu, Bell, Search, Settings, LogOut
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { DataProvider } from '@/contexts/DataContext';
-import { cn } from '@/lib/utils';
-
-const sidebarLinks = [
-  { name: 'Dashboard', path: '/admin', icon: LayoutDashboard, end: true },
-  { name: 'Movies', path: '/admin/movies', icon: Film },
-  { name: 'Cinemas & Rooms', path: '/admin/cinemas', icon: MonitorPlay },
-  { name: 'Showtimes', path: '/admin/showtimes', icon: Calendar },
-  { name: 'Tickets', path: '/admin/tickets', icon: Ticket },
-  { name: 'Users', path: '/admin/users', icon: Users },
-  { name: 'Staff & Roles', path: '/admin/staff', icon: Shield },
-  { name: 'Settings', path: '/admin/settings', icon: Settings },
-];
+import { AdminSidebar } from './AdminSidebar';
+import { motion, AnimatePresence } from 'motion/react';
+import { UserBadge } from '@/components/admin/ui/UserBadge';
 
 export function AdminLayout() {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
 
-  const filteredLinks = sidebarLinks.filter(link => {
-    if (!user?.permissions) return false;
-    if (link.path === '/admin') return user.permissions.includes('dashboard');
-    const requiredPermission = link.path.split('/').pop() || '';
-    return user.permissions.includes(requiredPermission);
-  });
-
-  // Authentication & Authorization Guard
   if (!user || !['admin', 'manager', 'staff'].includes(user.role)) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center">
-        <div className="w-20 h-20 rounded-3xl bg-red-500/10 border border-red-500/20 flex items-center justify-center mb-6">
-          <Shield className="w-10 h-10 text-red-500" />
+        <div className="w-24 h-24 rounded-[32px] bg-red-500/10 border border-red-500/20 flex items-center justify-center mb-8 shadow-2xl shadow-red-500/5">
+          <ShieldAlert className="w-12 h-12 text-red-500" />
         </div>
-        <h1 className="text-3xl font-display font-black text-white mb-2 uppercase tracking-tighter">Access Denied</h1>
-        <p className="text-gray-500 max-w-sm mb-8 font-medium">Your current identity lacks the cryptographic clearance required for this administrative node.</p>
-        <button 
-          onClick={() => navigate('/login')}
-          className="px-8 py-4 bg-white text-black rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-white/90 transition-all shadow-xl shadow-white/5 active:scale-95"
-        >
-          Authenticate Identity
-        </button>
+        <h1 className="text-4xl font-display font-black text-white mb-3 uppercase tracking-tighter">Access Denied</h1>
+        <p className="text-gray-500 max-w-sm mb-12 font-medium leading-relaxed">Your current identity lacks the cryptographic clearance required for this administrative node.</p>
+        <div className="flex flex-col sm:flex-row gap-4">
+          <button onClick={() => navigate('/login')} className="px-10 py-4 bg-white text-black rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-2xl shadow-white/10 hover:scale-105 active:scale-95 transition-all">Authenticate</button>
+          <button onClick={() => navigate('/')} className="px-10 py-4 bg-white/5 border border-white/10 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] hover:bg-white/10 transition-all">Go Home</button>
+        </div>
       </div>
     );
   }
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
-
   return (
-    <div className="min-h-screen bg-background text-white flex">
-        {/* Mobile Sidebar Overlay */}
+    <div className="min-h-screen bg-[#0F0F12] text-white flex">
+      {/* Persistent Sidebar Desktop */}
+      <div className="hidden lg:block">
+        <AdminSidebar />
+      </div>
+
+      {/* Mobile Drawer */}
+      <AnimatePresence>
         {isMobileOpen && (
-          <div 
-            className="fixed inset-0 bg-black/60 z-40 lg:hidden"
-            onClick={() => setIsMobileOpen(false)}
-          />
+          <div className="fixed inset-0 z-[100] lg:hidden">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/80 backdrop-blur-md"
+              onClick={() => setIsMobileOpen(false)}
+            />
+            <motion.div 
+              initial={{ x: '-100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '-100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="relative w-80 h-full"
+            >
+              <AdminSidebar isMobile onClose={() => setIsMobileOpen(false)} />
+            </motion.div>
+          </div>
         )}
+      </AnimatePresence>
 
-      {/* Sidebar */}
-      <aside className={cn(
-        "fixed inset-y-0 left-0 z-50 w-64 bg-surface border-r border-white/10 flex flex-col transition-transform duration-300 ease-in-out lg:translate-x-0",
-        isMobileOpen ? "translate-x-0" : "-translate-x-full"
-      )}>
-        <div className="h-16 flex items-center justify-between px-6 border-b border-white/10">
-          <div className="flex items-center gap-2">
-            <Film className="w-6 h-6 text-primary" />
-            <span className="text-lg font-display font-bold text-white tracking-wider">
-              CINEMAX Admin
-            </span>
-          </div>
-          <button 
-            className="lg:hidden text-gray-400 hover:text-white"
-            onClick={() => setIsMobileOpen(false)}
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
-          {filteredLinks.map((link) => {
-            const Icon = link.icon;
-            return (
-              <NavLink
-                key={link.name}
-                to={link.path}
-                end={link.end}
-                onClick={() => setIsMobileOpen(false)}
-                className={({ isActive }) => cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
-                  isActive 
-                    ? "bg-primary/10 text-primary" 
-                    : "text-gray-400 hover:text-white hover:bg-white/5"
-                )}
-              >
-                <Icon className="w-5 h-5" />
-                {link.name}
-              </NavLink>
-            );
-          })}
-        </nav>
-
-        <div className="p-4 border-t border-white/10">
-          <div className="flex items-center gap-3 px-3 py-3 mb-2 rounded-lg bg-black/20">
-            <img src={user?.avatar || 'https://i.pravatar.cc/150'} alt="Admin" className="w-8 h-8 rounded-full border border-white/20" />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-white truncate">{user?.name || 'Admin User'}</p>
-              <p className="text-xs text-gray-500 truncate capitalize">{user?.role || 'Administrator'}</p>
-            </div>
-          </div>
-          <button 
-            onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-red-400 hover:bg-red-400/10 transition-colors"
-          >
-            <LogOut className="w-5 h-5" />
-            Sign Out
-          </button>
-        </div>
-      </aside>
-
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col min-w-0 lg:pl-64">
-        <header className="h-16 bg-surface/50 backdrop-blur-sm border-b border-white/10 sticky top-0 z-30 flex items-center justify-between px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-4">
+      {/* Content Area */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Top Header */}
+        <header className="h-20 bg-surface/50 backdrop-blur-md border-b border-white/5 flex items-center justify-between px-8 z-40 sticky top-0">
+          <div className="flex items-center gap-6">
             <button 
-              className="lg:hidden p-2 -ml-2 text-gray-400 hover:text-white rounded-lg hover:bg-white/5"
               onClick={() => setIsMobileOpen(true)}
+              className="lg:hidden p-3 rounded-2xl bg-white/5 text-gray-400 hover:text-white transition-all"
             >
-              <Menu className="w-6 h-6" />
+              <Menu className="w-5 h-5" />
             </button>
-            <h1 className="text-lg font-semibold lg:hidden">Menu</h1>
-          </div>
-          
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => navigate('/')}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-colors border border-white/10"
-              title="View site as end user"
-            >
-              <Eye className="w-4 h-4" />
-              <span className="hidden sm:inline">View as User</span>
-            </button>
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-              <span className="text-sm text-gray-400">System Online</span>
+            <div className="hidden sm:flex items-center gap-4 px-6 py-2.5 rounded-2xl bg-black/20 border border-white/5 group/search w-[400px]">
+               <Search className="w-4 h-4 text-gray-500 group-focus-within/search:text-primary transition-colors" />
+               <input type="text" placeholder="Access system nodes..." className="bg-transparent border-none outline-none text-xs font-bold w-full placeholder-gray-700" />
             </div>
+          </div>
+
+          <div className="flex items-center gap-6">
+             <div className="flex items-center gap-3">
+                <button className="w-10 h-10 rounded-xl flex items-center justify-center text-gray-500 hover:text-white hover:bg-white/5 transition-all relative">
+                   <Bell className="w-5 h-5" />
+                   <span className="absolute top-2 right-2 w-2 h-2 bg-primary rounded-full ring-4 ring-[#16161A]" />
+                </button>
+                <Link to="/admin/settings" className="w-10 h-10 rounded-xl flex items-center justify-center text-gray-500 hover:text-white hover:bg-white/5 transition-all">
+                   <Settings className="w-5 h-5" />
+                </Link>
+                <button 
+                  onClick={useAuth().logout} 
+                  className="w-10 h-10 rounded-xl flex items-center justify-center text-red-500/60 hover:text-red-500 hover:bg-red-500/10 transition-all ml-1"
+                  title="Terminate Session"
+                >
+                   <LogOut className="w-5 h-5" />
+                </button>
+             </div>
           </div>
         </header>
 
-        <main className="flex-1 p-4 sm:p-6 lg:p-8">
-          <Outlet />
+        {/* Dynamic Route View */}
+        <main className="flex-1 p-8 lg:p-12 overflow-y-auto">
+           <Outlet />
         </main>
-        </div>
+      </div>
     </div>
   );
 }

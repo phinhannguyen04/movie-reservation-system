@@ -10,7 +10,7 @@ interface SeatMapProps {
 }
 
 export function SeatMap({ seats, selectedSeats, bookedSeats, onSeatClick }: SeatMapProps) {
-  const rows = ['A','B','C','D','E','F','G','H','I','J'];
+  const rows = Array.from(new Set(seats.map(s => s.row))).sort();
 
   return (
     <div className="bg-surface rounded-xl p-6 border border-white/5 overflow-hidden">

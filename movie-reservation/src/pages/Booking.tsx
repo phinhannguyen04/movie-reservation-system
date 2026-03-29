@@ -5,7 +5,7 @@ import { ChevronLeft, Calendar as CalendarIcon, MapPin, CheckCircle2 } from 'luc
 import { format, addDays } from 'date-fns';
 import { QRCodeSVG } from 'qrcode.react';
 import { cn } from '@/lib/utils';
-import { movies, cinemas, generateShowtimes, generateSeats, type Showtime, type Seat } from '@/data/mock';
+import { generateSeats, type Showtime, type Seat } from '@/data/mock';
 import { api } from '@/services/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/contexts/DataContext';
@@ -23,7 +23,7 @@ export function Booking() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
-  const { refreshTickets } = useData();
+  const { movies, cinemas, showtimes: allShowtimes, refreshTickets } = useData();
   const { showToast } = useToast();
   
   const movie = movies.find(m => m.id === id);
@@ -42,7 +42,12 @@ export function Booking() {
   const [bookingError, setBookingError] = useState('');
 
   const dates = useMemo(() => Array.from({ length: 7 }).map((_, i) => addDays(new Date(), i)), []);
-  const showtimes = useMemo(() => generateShowtimes(id || '', format(selectedDate, 'yyyy-MM-dd')), [id, selectedDate]);
+  const showtimes = useMemo(() => {
+    return allShowtimes.filter(s => {
+      const showtimeDate = s.date.includes('T') ? s.date.split('T')[0] : s.date;
+      return s.movieId === id && showtimeDate === format(selectedDate, 'yyyy-MM-dd');
+    });
+  }, [id, selectedDate, allShowtimes]);
   const bookedSeats = useMemo(() => new Set(occupiedSeats), [occupiedSeats]);
   const totalPrice = useMemo(() => selectedSeats.reduce((sum, seat) => sum + seat.price, 0), [selectedSeats]);
 
@@ -74,8 +79,17 @@ export function Booking() {
   }, [searchParams, showtimes, selectedShowtime]);
 
   useEffect(() => {
-    if (step === 2 && seats.length === 0) setSeats(generateSeats());
-  }, [step, seats.length]);
+    setSelectedSeats([]);
+    setSeats([]); // Reset seats layout to force regeneration based on room capacity
+  }, [selectedShowtime?.id]);
+
+  useEffect(() => {
+    if (step === 2 && seats.length === 0 && selectedShowtime && selectedCinema) {
+      const cinema = cinemas.find(c => c.id === selectedCinema);
+      const room = cinema?.rooms.find(r => r.name === selectedShowtime.screen);
+      setSeats(generateSeats(room?.capacity));
+    }
+  }, [step, seats.length, selectedShowtime, selectedCinema, cinemas]);
 
   if (!movie) return <div className="p-12 text-center">Movie not found</div>;
 

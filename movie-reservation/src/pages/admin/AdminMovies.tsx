@@ -7,7 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/contexts/DataContext';
 import { useDataTable } from '@/hooks/useDataTable';
 import { CheckCircle, AlertCircle, Plus, Film } from 'lucide-react';
-import { AdminHeader } from '@/components/admin/ui/AdminHeader';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { motion, AnimatePresence } from 'motion/react';
 
 export function AdminMovies() {
@@ -190,7 +190,7 @@ export function AdminMovies() {
 
   return (
     <div className="h-full relative flex flex-col gap-8">
-      <AdminHeader 
+      <PageHeader 
         title="Production Registry"
         description="Curate and manage the cinematic library. Monitor active screenings and production metadata."
         category="Content Node"
@@ -217,10 +217,15 @@ export function AdminMovies() {
           onFilterClick={() => setIsFilterOpen(true)}
           filterButtonActive={activeFiltersCount > 0}
           onEdit={canCrud ? handleEdit : undefined}
-          onDelete={canCrud ? (item) => {
+          onDelete={canCrud ? async (item) => {
              if(confirm(`Are you sure you want to delete "${item.title}"?`)) {
-                deleteMovie(item.id);
-                showToast('success', 'Movie deleted');
+                try {
+                  await deleteMovie(item.id);
+                  showToast('success', 'Movie deleted');
+                } catch (err) {
+                  showToast('error', 'Failed to delete movie. It may have active showtimes.');
+                  console.error(err);
+                }
              }
           } : undefined}
         />
@@ -271,13 +276,37 @@ export function AdminMovies() {
                 <input name="endDate" type="date" defaultValue={editingMovie?.endDate} className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-primary/50 focus:outline-none transition-all" />
               </div>
             </div>
-            <div>
-              <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5">Genres</label>
-              <input name="genre" required type="text" defaultValue={editingMovie?.genre.join(', ')} className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-primary/50 focus:outline-none transition-all" placeholder="Action, Sci-Fi" />
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5">Genres</label>
+                <input name="genre" required type="text" defaultValue={editingMovie?.genre.join(', ')} className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-primary/50 focus:outline-none transition-all" placeholder="Action, Sci-Fi" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5">Director</label>
+                <input name="director" type="text" defaultValue={editingMovie?.director} className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-primary/50 focus:outline-none transition-all" placeholder="Christopher Nolan" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5">Poster URL</label>
+                <input name="posterUrl" type="text" defaultValue={editingMovie?.posterUrl} className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-primary/50 focus:outline-none transition-all" placeholder="https://..." />
+              </div>
+              <div>
+                <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5">Backdrop URL</label>
+                <input name="backdropUrl" type="text" defaultValue={editingMovie?.backdropUrl} className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-primary/50 focus:outline-none transition-all" placeholder="https://..." />
+              </div>
             </div>
             <div>
-              <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5">Director</label>
-              <input name="director" type="text" defaultValue={editingMovie?.director} className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-primary/50 focus:outline-none transition-all" placeholder="Christopher Nolan" />
+              <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5">Trailer URL (YouTube Embed)</label>
+              <input name="trailerUrl" type="text" defaultValue={editingMovie?.trailerUrl} className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-primary/50 focus:outline-none transition-all" placeholder="https://www.youtube.com/embed/..." />
+            </div>
+            <div>
+              <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5">Cast (Comma separated)</label>
+              <input name="cast" type="text" defaultValue={editingMovie?.cast.join(', ')} className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-primary/50 focus:outline-none transition-all" placeholder="Actor 1, Actor 2" />
+            </div>
+            <div>
+              <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5">Synopsis</label>
+              <textarea name="synopsis" rows={3} defaultValue={editingMovie?.synopsis} className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-primary/50 focus:outline-none transition-all resize-none" placeholder="Movie description..." />
             </div>
           </div>
           

@@ -30,7 +30,7 @@ export function UserAvatar({ name = 'User', avatar, className, size = 'md' }: Us
         src={avatar} 
         alt={name} 
         className={cn(
-          "rounded-full object-cover bg-surface border border-white/10 shrink-0",
+          "rounded-2xl object-cover bg-surface border border-white/10 shrink-0",
           sizeClasses[size],
           className
         )} 
@@ -40,12 +40,13 @@ export function UserAvatar({ name = 'User', avatar, className, size = 'md' }: Us
 
   // Consistent background colors based on name hash
   const colors = [
-    'bg-blue-500/20 text-blue-400 border-blue-500/30',
-    'bg-purple-500/20 text-purple-400 border-purple-500/30',
-    'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-    'bg-amber-500/20 text-amber-400 border-amber-500/30',
-    'bg-rose-500/20 text-rose-400 border-rose-500/30',
-    'bg-indigo-500/20 text-indigo-400 border-indigo-500/30',
+    'bg-blue-500/10 text-blue-400 border-blue-500/20',
+    'bg-purple-500/10 text-purple-400 border-purple-500/20',
+    'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+    'bg-amber-500/10 text-amber-400 border-amber-500/20',
+    'bg-rose-500/10 text-rose-400 border-rose-500/20',
+    'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
+    'bg-white/5 text-gray-400 border-white/10',
   ];
   
   const colorIndex = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % colors.length;
@@ -53,7 +54,7 @@ export function UserAvatar({ name = 'User', avatar, className, size = 'md' }: Us
 
   return (
     <div className={cn(
-      "rounded-full flex items-center justify-center font-black tracking-tighter border shadow-inner transition-transform hover:scale-105 shrink-0",
+      "rounded-2xl flex items-center justify-center font-black tracking-tighter border shadow-inner transition-transform hover:scale-105 shrink-0 uppercase",
       sizeClasses[size],
       colorClass,
       className

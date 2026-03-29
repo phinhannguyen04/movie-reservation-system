@@ -15,6 +15,7 @@ export function MyTickets() {
   const [activeTab, setActiveTab] = useState<'pending' | 'upcoming' | 'past'>('upcoming');
   const [searchQuery, setSearchQuery] = useState('');
   const [dateFilter, setDateFilter] = useState<'all' | '7days' | '30days'>('all');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 6;
 
@@ -31,7 +32,7 @@ export function MyTickets() {
   // Reset pagination when generic filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [activeTab, searchQuery, dateFilter]);
+  }, [activeTab, searchQuery, dateFilter, sortOrder]);
 
   const now = new Date();
 
@@ -94,9 +95,13 @@ export function MyTickets() {
       });
     }
 
-    // Sort by most recent booking first
-    return filtered.sort((a, b) => new Date(b.bookingDate).getTime() - new Date(a.bookingDate).getTime());
-  }, [tickets, user?.id, activeTab, dateFilter, searchQuery]);
+    // 5. Final Sorting
+    return filtered.sort((a, b) => {
+      const time1 = new Date(a.bookingDate).getTime();
+      const time2 = new Date(b.bookingDate).getTime();
+      return sortOrder === 'desc' ? time2 - time1 : time1 - time2;
+    });
+  }, [tickets, user?.id, activeTab, dateFilter, searchQuery, sortOrder]);
 
   // Derived arrays
   const totalPages = Math.ceil(baseBookings.length / itemsPerPage);
@@ -180,6 +185,15 @@ export function MyTickets() {
             <option value="7days" className="bg-surface">Last 7 Days</option>
             <option value="30days" className="bg-surface">Last 30 Days</option>
           </select>
+          
+          <button
+            onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
+            className="bg-white/5 border border-white/10 rounded-xl p-3 text-white hover:bg-white/10 transition-colors flex items-center gap-2"
+            title={sortOrder === 'desc' ? "Sorted by Newest" : "Sorted by Oldest"}
+          >
+            <span className="text-sm font-medium hidden sm:inline">{sortOrder === 'desc' ? "Newest" : "Oldest"}</span>
+            <RefreshCw className={cn("w-4 h-4 transition-transform duration-500", sortOrder === 'asc' && "rotate-180")} />
+          </button>
         </div>
       </div>
 
