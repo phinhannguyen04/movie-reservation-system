@@ -217,10 +217,15 @@ export function AdminMovies() {
           onFilterClick={() => setIsFilterOpen(true)}
           filterButtonActive={activeFiltersCount > 0}
           onEdit={canCrud ? handleEdit : undefined}
-          onDelete={canCrud ? (item) => {
+          onDelete={canCrud ? async (item) => {
              if(confirm(`Are you sure you want to delete "${item.title}"?`)) {
-                deleteMovie(item.id);
-                showToast('success', 'Movie deleted');
+                try {
+                  await deleteMovie(item.id);
+                  showToast('success', 'Movie deleted');
+                } catch (err) {
+                  showToast('error', 'Failed to delete movie. It may have active showtimes.');
+                  console.error(err);
+                }
              }
           } : undefined}
         />

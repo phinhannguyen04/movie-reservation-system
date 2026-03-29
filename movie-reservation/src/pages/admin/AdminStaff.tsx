@@ -8,7 +8,7 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { api } from '@/services/api';
 import { useData, User, Staff } from '@/contexts/DataContext';
 import { useDataTable } from '@/hooks/useDataTable';
-import { UserAvatar } from '@/components/ui/UserAvatar';
+import { UserBadge } from '@/components/admin/ui/UserBadge';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/lib/utils';
 
@@ -194,13 +194,11 @@ export function AdminStaff() {
        header: 'Personnel', 
        accessor: 'name' as const, 
        render: (item: Staff) => (
-         <div className="flex items-center gap-3">
-             <UserAvatar name={item.name} avatar={undefined} size="md" />
-            <div>
-               <p className="font-bold text-white group-hover/row:text-primary transition-colors">{item.name}</p>
-               <p className="text-[10px] text-gray-500 font-medium">{item.email}</p>
-            </div>
-         </div>
+         <UserBadge 
+           name={item.name} 
+           avatar={undefined} 
+           role={SYSTEM_ROLES.find(r => r.id === item.role)?.label || 'Staff'} 
+         />
        )
     },
     {

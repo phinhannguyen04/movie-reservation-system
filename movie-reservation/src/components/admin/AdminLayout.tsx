@@ -1,36 +1,17 @@
 import { useState } from 'react';
-import { NavLink, Outlet, useNavigate, Link } from 'react-router-dom';
+import { Outlet, useNavigate, Link } from 'react-router-dom';
 import { 
-  LayoutDashboard, Film, MonitorPlay, Calendar, 
-  Ticket, Users, Shield, Settings, X, ShieldAlert 
+  Film, ShieldAlert, Menu, Bell, Search, Settings, LogOut
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { cn } from '@/lib/utils';
-import { AdminNavbar } from './AdminNavbar';
+import { AdminSidebar } from './AdminSidebar';
 import { motion, AnimatePresence } from 'motion/react';
-
-const sidebarLinks = [
-  { name: 'Dashboard', path: '/admin', icon: LayoutDashboard, end: true },
-  { name: 'Movies', path: '/admin/movies', icon: Film },
-  { name: 'Cinemas', path: '/admin/cinemas', icon: MonitorPlay },
-  { name: 'Showtimes', path: '/admin/showtimes', icon: Calendar },
-  { name: 'Tickets', path: '/admin/tickets', icon: Ticket },
-  { name: 'Users', path: '/admin/users', icon: Users },
-  { name: 'Staff', path: '/admin/staff', icon: Shield },
-  { name: 'Settings', path: '/admin/settings', icon: Settings },
-];
+import { UserBadge } from '@/components/admin/ui/UserBadge';
 
 export function AdminLayout() {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const { user } = useAuth();
   const navigate = useNavigate();
-
-  const filteredLinks = sidebarLinks.filter(link => {
-    if (!user?.permissions) return false;
-    if (link.path === '/admin') return user.permissions.includes('dashboard');
-    const requiredPermission = link.path.split('/').pop() || '';
-    return user.permissions.includes(requiredPermission);
-  });
 
   if (!user || !['admin', 'manager', 'staff'].includes(user.role)) {
     return (
@@ -49,77 +30,78 @@ export function AdminLayout() {
   }
 
   return (
-    <div className="min-h-screen bg-background text-white">
-      <AdminNavbar onMenuClick={() => setIsMobileOpen(true)} />
+    <div className="min-h-screen bg-[#0F0F12] text-white flex">
+      {/* Persistent Sidebar Desktop */}
+      <div className="hidden lg:block">
+        <AdminSidebar />
+      </div>
 
-      {/* Mobile Sidebar Overlay */}
+      {/* Mobile Drawer */}
       <AnimatePresence>
         {isMobileOpen && (
-          <>
+          <div className="fixed inset-0 z-[100] lg:hidden">
             <motion.div 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/80 backdrop-blur-md z-[60] lg:hidden"
+              className="absolute inset-0 bg-black/80 backdrop-blur-md"
               onClick={() => setIsMobileOpen(false)}
             />
-            <motion.aside 
+            <motion.div 
               initial={{ x: '-100%' }}
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="fixed inset-y-0 left-0 w-80 bg-surface border-r border-white/10 z-[70] lg:hidden p-6 flex flex-col shadow-2xl"
+              className="relative w-80 h-full"
             >
-              <div className="flex items-center justify-between mb-10">
-                <Link to="/admin" className="flex items-center gap-2">
-                  <Film className="w-8 h-8 text-primary" />
-                  <span className="text-2xl font-display font-bold text-white tracking-wider">CINEMAX</span>
-                </Link>
-                <button onClick={() => setIsMobileOpen(false)} className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/5 text-gray-400 hover:text-white transition-colors">
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <nav className="flex-1 space-y-2">
-                {filteredLinks.map((link) => {
-                  const Icon = link.icon;
-                  return (
-                    <NavLink
-                      key={link.name}
-                      to={link.path}
-                      end={link.end}
-                      onClick={() => setIsMobileOpen(false)}
-                      className={({ isActive }) => cn(
-                        "flex items-center gap-4 px-5 py-4 rounded-2xl text-base font-bold transition-all",
-                        isActive 
-                          ? "bg-primary text-white shadow-xl shadow-primary/20" 
-                          : "text-gray-400 hover:text-white hover:bg-white/5"
-                      )}
-                    >
-                      <Icon className="w-5 h-5" />
-                      {link.name}
-                    </NavLink>
-                  );
-                })}
-              </nav>
-
-              <div className="pt-6 border-t border-white/10 mt-auto">
-                <div className="flex items-center gap-4 p-4 rounded-2xl bg-white/5 border border-white/5 mb-4">
-                  <img src={user?.avatar || 'https://i.pravatar.cc/150'} alt="Admin" className="w-12 h-12 rounded-xl border border-white/10 object-cover" />
-                  <div className="flex flex-col min-w-0">
-                    <p className="text-sm font-black text-white truncate">{user?.name}</p>
-                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest truncate">{user?.role}</p>
-                  </div>
-                </div>
-              </div>
-            </motion.aside>
-          </>
+              <AdminSidebar isMobile onClose={() => setIsMobileOpen(false)} />
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 sm:py-32">
-        <Outlet />
-      </main>
+      {/* Content Area */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Top Header */}
+        <header className="h-20 bg-surface/50 backdrop-blur-md border-b border-white/5 flex items-center justify-between px-8 z-40 sticky top-0">
+          <div className="flex items-center gap-6">
+            <button 
+              onClick={() => setIsMobileOpen(true)}
+              className="lg:hidden p-3 rounded-2xl bg-white/5 text-gray-400 hover:text-white transition-all"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+            <div className="hidden sm:flex items-center gap-4 px-6 py-2.5 rounded-2xl bg-black/20 border border-white/5 group/search w-[400px]">
+               <Search className="w-4 h-4 text-gray-500 group-focus-within/search:text-primary transition-colors" />
+               <input type="text" placeholder="Access system nodes..." className="bg-transparent border-none outline-none text-xs font-bold w-full placeholder-gray-700" />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-6">
+             <div className="flex items-center gap-3">
+                <button className="w-10 h-10 rounded-xl flex items-center justify-center text-gray-500 hover:text-white hover:bg-white/5 transition-all relative">
+                   <Bell className="w-5 h-5" />
+                   <span className="absolute top-2 right-2 w-2 h-2 bg-primary rounded-full ring-4 ring-[#16161A]" />
+                </button>
+                <Link to="/admin/settings" className="w-10 h-10 rounded-xl flex items-center justify-center text-gray-500 hover:text-white hover:bg-white/5 transition-all">
+                   <Settings className="w-5 h-5" />
+                </Link>
+                <button 
+                  onClick={useAuth().logout} 
+                  className="w-10 h-10 rounded-xl flex items-center justify-center text-red-500/60 hover:text-red-500 hover:bg-red-500/10 transition-all ml-1"
+                  title="Terminate Session"
+                >
+                   <LogOut className="w-5 h-5" />
+                </button>
+             </div>
+          </div>
+        </header>
+
+        {/* Dynamic Route View */}
+        <main className="flex-1 p-8 lg:p-12 overflow-y-auto">
+           <Outlet />
+        </main>
+      </div>
     </div>
   );
 }

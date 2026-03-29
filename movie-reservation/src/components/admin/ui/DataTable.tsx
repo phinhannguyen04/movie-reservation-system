@@ -214,7 +214,7 @@ export function DataTable<T extends { id: string | number }>({
                     </td>
                   ))}
                   <td className="px-6 py-5 border-b border-white/[0.03] text-right">
-                    <div className="flex items-center justify-end gap-1 opacity-0 group-hover/row:opacity-100 transition-all translate-x-4 group-hover/row:translate-x-0">
+                    <div className="flex items-center justify-end gap-1 opacity-40 group-hover/row:opacity-100 transition-all group-hover/row:translate-x-0">
                       {onEdit && (
                         <button 
                           onClick={() => onEdit(item)} 
