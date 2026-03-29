@@ -3,12 +3,12 @@ import { DataTable } from '@/components/admin/ui/DataTable';
 import { Modal } from '@/components/admin/ui/Modal';
 import { AdvancedFilterModal, FilterConfig } from '@/components/admin/ui/AdvancedFilterModal';
 import { useAuth } from '@/contexts/AuthContext';
-import { Shield, Check, X, UserPlus, Eye, Search, Trash2, ArrowRight, Layers, LayoutGrid, Users } from 'lucide-react';
-import { AdminHeader } from '@/components/admin/ui/AdminHeader';
+import { Search, Shield, Lock, CheckCircle, AlertCircle, LayoutGrid, Users, Check, X, UserPlus, Eye, Trash2, ArrowRight, Plus } from 'lucide-react';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { api } from '@/services/api';
 import { useData, User, Staff } from '@/contexts/DataContext';
 import { useDataTable } from '@/hooks/useDataTable';
-import { UserAvatar } from '@/components/ui/UserAvatar';
+import { UserBadge } from '@/components/admin/ui/UserBadge';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/lib/utils';
 
@@ -194,13 +194,11 @@ export function AdminStaff() {
        header: 'Personnel', 
        accessor: 'name' as const, 
        render: (item: Staff) => (
-         <div className="flex items-center gap-3">
-             <UserAvatar name={item.name} avatar={undefined} size="md" />
-            <div>
-               <p className="font-bold text-white group-hover/row:text-primary transition-colors">{item.name}</p>
-               <p className="text-[10px] text-gray-500 font-medium">{item.email}</p>
-            </div>
-         </div>
+         <UserBadge 
+           name={item.name} 
+           avatar={undefined} 
+           role={SYSTEM_ROLES.find(r => r.id === item.role)?.label || 'Staff'} 
+         />
        )
     },
     {
@@ -239,11 +237,11 @@ export function AdminStaff() {
   // ── RENDER ─────────────────────────────────────────────────────
   return (
     <div className="h-full relative flex flex-col gap-8">
-      <AdminHeader 
-        title="Command Hierarchy"
-        description="Provision and manage executive privileges for the theater network personnel. Audit staff activity and permissions."
-        category="Personnel Management"
-        icon={Users}
+      <PageHeader 
+        title="Staff Nodes"
+        description="Monitor system-wide administrative protocols, manage staff roles, and audit node permissions."
+        category="Security Center"
+        icon={Shield}
         actions={
           <div className="flex items-center gap-4 bg-surface/40 backdrop-blur-md p-1.5 rounded-2xl border border-white/5 shadow-2xl">
             <button
@@ -593,16 +591,4 @@ export function AdminStaff() {
   );
 }
 
-// Minimal CheckCircle icon if not in lucide scope
-function CheckCircle(props: any) {
-  return (
-    <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-  );
-}
 
-// Minimal AlertCircle icon
-function AlertCircle(props: any) {
-  return (
-    <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-  );
-}

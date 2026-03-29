@@ -6,7 +6,7 @@ import { AdvancedFilterModal, FilterConfig } from "@/components/admin/ui/Advance
 import { useData } from "@/contexts/DataContext";
 import { Booking } from "@/data/mock";
 import { useDataTable } from "@/hooks/useDataTable";
-import { AdminHeader } from "@/components/admin/ui/AdminHeader";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { UserAvatar } from "@/components/ui/UserAvatar";
 import { BookingStatusBadge } from "@/components/admin/BookingStatusBadge";
 import { RecentActivity } from "@/components/admin/RecentActivity";
@@ -186,14 +186,14 @@ export function AdminDashboard() {
 
   return (
     <div className="space-y-10 pb-16">
-      <AdminHeader 
+      <PageHeader 
         title="Command Center"
         description="Monitor theater performance, manage logical resources, and oversee real-time reservation throughput."
         category="System Live"
         icon={LayoutGrid}
         actions={
           <div className="flex items-center gap-4">
-            <div className="bg-surface/40 backdrop-blur-md border border-white/5 rounded-2xl p-4 flex items-center gap-4 shadow-xl shadow-black/20 group/date transition-all hover:border-white/10">
+            <div className="hidden lg:flex bg-surface/40 backdrop-blur-md border border-white/5 rounded-2xl p-4 flex items-center gap-4 shadow-xl shadow-black/20 group/date transition-all hover:border-white/10">
                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20">
                   <Calendar className="w-5 h-5 text-primary" />
                </div>

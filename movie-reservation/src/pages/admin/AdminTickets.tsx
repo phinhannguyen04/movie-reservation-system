@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Booking } from '@/data/mock';
 import { DataTable } from '@/components/admin/ui/DataTable';
 import { AdvancedFilterModal, FilterConfig } from '@/components/admin/ui/AdvancedFilterModal';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/contexts/DataContext';
 import { useDataTable } from '@/hooks/useDataTable';
@@ -187,6 +188,12 @@ export function AdminTickets() {
 
   return (
     <div className="h-full relative flex flex-col gap-6">
+      <PageHeader 
+        title="Ticketing Ledger"
+        description="Monitor system-wide reservation throughput and manage secure transaction records."
+        category="Financial Hub"
+        icon={Ticket}
+      />
       <DataTable 
         title="Transaction Ledger" 
         description="Encrypted audit log of all customer reservations, financial throughput, and ticket lifecycles." 

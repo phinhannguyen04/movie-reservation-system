@@ -6,8 +6,8 @@ import { AdvancedFilterModal, FilterConfig } from '@/components/admin/ui/Advance
 import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/contexts/DataContext';
 import { useDataTable } from '@/hooks/useDataTable';
-import { Plus, Trash2, MonitorPlay, MapPin, Building2, CheckCircle, AlertCircle, LayoutGrid } from 'lucide-react';
-import { AdminHeader } from '@/components/admin/ui/AdminHeader';
+import { MapPin, Plus, CheckCircle, AlertCircle, MonitorPlay, Trash2, Building2, LayoutGrid } from 'lucide-react';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { motion, AnimatePresence } from 'motion/react';
 
 export function AdminCinemas() {
@@ -179,18 +179,18 @@ export function AdminCinemas() {
 
   return (
     <div className="h-full relative flex flex-col gap-8">
-      <AdminHeader 
-        title="Theater Network"
-        description="Configure physical theater nodes, initialize screening rooms, and manage seating capacities."
-        category="Infrastructure"
-        icon={Building2}
+      <PageHeader 
+        title="Cinema Infrastructure"
+        description="Configure physical theater nodes, manage screen configurations, and monitor hardware status."
+        category="Asset Management"
+        icon={MonitorPlay}
         actions={
-          canCrud ? (
+          user?.role === 'admin' ? (
             <button 
               onClick={() => { setEditingCinema(null); setIsModalOpen(true); }}
               className="px-6 py-4 bg-white text-black hover:bg-white/90 rounded-2xl transition-all text-xs font-black uppercase tracking-widest shadow-xl shadow-white/5 flex items-center gap-2 active:scale-95"
             >
-              <Plus className="w-4 h-4" /> Initialize Cinema
+              <Plus className="w-4 h-4" /> Provision Cinema
             </button>
           ) : undefined
         }

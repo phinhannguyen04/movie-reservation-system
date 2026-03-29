@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Film, Home, Ticket, User, Search, X, Calendar, LogOut, Shield } from 'lucide-react';
+import { Film, Home, Ticket, User, Search, X, Calendar, LogOut, Shield, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { movies } from '@/data/mock';
 import { useAuth } from '@/contexts/AuthContext';
@@ -156,26 +156,37 @@ export function Navbar() {
                   Admin Panel
                 </Link>
               )}
-              {isAuthenticated && user ? (
+               {isAuthenticated && user ? (
                 <div className="flex items-center gap-2 ml-6 pl-6 border-l border-white/10">
-                  <div className="flex items-center gap-3 pr-2">
+                  <Link to="/profile" className="flex items-center gap-3 pr-2 group/user cursor-pointer">
                     <UserAvatar 
                       name={user.name} 
                       avatar={user.avatar} 
-                      className="w-10 h-10 rounded-xl border border-white/10 shrink-0 object-cover shadow-lg shadow-black/20" 
+                      className="w-10 h-10 rounded-xl border border-white/10 shrink-0 object-cover shadow-lg shadow-black/20 group-hover/user:border-primary/50 transition-colors" 
                     />
                     <div className="flex flex-col text-left">
-                      <span className="text-sm font-black text-white tracking-tight leading-none mb-1 whitespace-nowrap">{user.name}</span>
-                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest leading-none">System User</span>
+                      <span className="text-sm font-black text-white tracking-tight leading-none mb-1 whitespace-nowrap group-hover/user:text-primary transition-colors">{user.name}</span>
+                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest leading-none">
+                        {user.role === 'admin' ? 'System Admin' : 'System User'}
+                      </span>
                     </div>
+                  </Link>
+                  <div className="flex items-center gap-1">
+                    <Link 
+                      to="/profile?tab=settings" 
+                      className="w-10 h-10 flex items-center justify-center text-gray-500 hover:text-white hover:bg-white/5 rounded-xl transition-all"
+                      title="User Settings"
+                    >
+                      <Settings className="w-5 h-5" />
+                    </Link>
+                    <button 
+                      onClick={logout} 
+                      className="w-10 h-10 flex items-center justify-center text-gray-500 hover:text-red-500 hover:bg-red-500/5 rounded-xl transition-all"
+                      title="Terminate Session"
+                    >
+                      <LogOut className="w-5 h-5" />
+                    </button>
                   </div>
-                  <button 
-                    onClick={logout} 
-                    className="w-10 h-10 flex items-center justify-center text-gray-500 hover:text-white hover:bg-white/5 rounded-xl transition-all"
-                    title="Terminate Session"
-                  >
-                    <LogOut className="w-5 h-5" />
-                  </button>
                 </div>
               ) : (
                 <div className="flex items-center gap-2 ml-4">
