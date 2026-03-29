@@ -15,7 +15,8 @@ public class AppDbContext : DbContext
     public DbSet<User> Users => Set<User>();
     public DbSet<Staff> Staff => Set<Staff>();
     public DbSet<SystemSettings> SystemSettings => Set<SystemSettings>();
-
+    public DbSet<ShowTimeSeatPrice> ShowTimeSeatPrices => Set<ShowTimeSeatPrice>();
+    
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -36,8 +37,36 @@ public class AppDbContext : DbContext
             .WithOne(r => r.Cinema)
             .HasForeignKey(r => r.CinemaId)
             .OnDelete(DeleteBehavior.Cascade);
+        
+        // ── ShowtimeSeatPrice (Pricing per Category per Showtime) ────────
+        modelBuilder.Entity<ShowTimeSeatPrice>(e =>
+        {
+            /* 
+             * Logic: Each seat category in a showtime must have exactly ONE unique price.
+             * This unique index prevents duplicate price entries for the same category in a single showtime.
+             * 
+             * Valid Scenario:
+             *   - Showtime A | Standard | 100,000 VND 
+             *   - Showtime A | VIP      | 200,000 VND
+             * 
+             * Invalid Scenario (Will throw error):
+             *   - Showtime A | Standard | 50,000 VND (Because Showtime A already has a Standard price)
+             */
+            e.HasIndex(sp => new { sp.ShowtimeId, sp.Category }).IsUnique();
 
-        // ── Showtime → Movie, Cinema ──────────────────────
+            e.HasOne(sp => sp.Showtime)
+                .WithMany()
+                .HasForeignKey(sp => sp.ShowtimeId)
+                .OnDelete(DeleteBehavior.Cascade);
+            
+            // Store Enum as string for better readability in DB
+            e.Property(sp => sp.Category).HasConversion<string>();
+            
+            // Decimal formatting for currency
+            e.Property(sp => sp.Price).HasColumnType("decimal(10,2)");
+        });
+
+        // ── Showtime → Movie, Cinema, ShowtimePrice ──────────────────────
         modelBuilder.Entity<Showtime>()
             .HasOne(s => s.Movie)
             .WithMany(m => m.Showtimes)
@@ -51,6 +80,7 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<Showtime>()
             .HasIndex(s => new { s.MovieId, s.Date });
 
+        
         // ── Booking → Movie, Cinema, Showtime, User ──────
         modelBuilder.Entity<Booking>(e =>
         {
@@ -80,5 +110,6 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<Staff>()
             .HasIndex(s => s.Email)
             .IsUnique();
+        
     }
 }
