@@ -25,6 +25,8 @@ out/
 *.suo
 *.userosscache
 *.sln.docstates
+**/appsettings.json
+**/appsettings.Development.json
 
 # Database
 *.db

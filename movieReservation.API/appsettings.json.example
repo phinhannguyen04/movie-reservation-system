@@ -8,10 +8,10 @@
   },
   "AllowedHosts": "*",
   "ConnectionStrings": {
-    "DefaultConnection": "Host=localhost;Port=5433;Database=moviereservation;Username=postgres;Password=postgres"
+    "DefaultConnection": "Host=localhost;Port=5433;Database=moviereservation;Username=postgres;Password=<YOUR_POSTGRES_PASSWORD>"
   },
   "JwtSettings": {
-    "SecretKey": "SuperSecretKey_MovieReservation_2026_MustBe32CharsLong!",
+    "SecretKey": "<YOUR_SECURE_JWT_SECRET_KEY_AT_LEAST_32_CHARS>",
     "Issuer": "MovieReservation.API",
     "Audience": "MovieReservation.Client",
     "ExpirationInMinutes": 1440

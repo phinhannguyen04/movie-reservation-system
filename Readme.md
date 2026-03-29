@@ -1,95 +1,79 @@
-# Movie Reservation System - Technical Documentation and Operation Guide
+# Movie Reservation System User Manual and Operational Guide
 
-This document provides comprehensive instructions for the installation, configuration, and maintenance of the Movie Reservation System.
+This document serves as the formal instruction manual for the Movie Reservation System, a comprehensive platform designed for modern cinema management and customer engagement.
 
----
+## 1. System Overview
 
-## 1. System Installation and Initialization
+The Movie Reservation System is a sophisticated web application that facilitates seamless movie discovery, seat selection, and ticket reservation. Built with a robust ASP.NET Core backend and a responsive React frontend, it provides specialized interfaces for system administrators, cinema managers, operational staff, and customers.
 
-The system architecture consists of two primary components: the Backend (ASP.NET API) and the Frontend (Vite + React).
+## 2. Preliminary Requirements
 
-### 1.1. Database Configuration (Docker)
-The local environment requires Docker Desktop to be installed and active.
-1. Open the terminal within the following directory: `movie/movieReservation.API`.
-2. Execute the command: `docker compose up -d postgres`.
-3. Connectivity: The database is configured to operate on port 5433.
+Successful deployment and operation of the system require the following environment configurations:
 
-### 1.2. Backend Service Initialization (API)
-The environment requires the .NET 8 SDK.
-1. Open the project in JetBrains Rider or Visual Studio Code.
-2. Execute the application via the IDE or the terminal command: `dotnet run`.
-3. Base URL: `http://localhost:5176`.
-4. API Documentation (Swagger): `http://localhost:5176/swagger`.
+1.  **Distributed Database**: Docker Desktop must be installed and active to host the PostgreSQL database instance.
+2.  **Server Environment**: .NET 8 SDK is required to build and execute the backend services.
+3.  **Client Environment**: Node.js and NPM are required for the frontend application development server.
 
-### 1.3. Frontend Application Initialization
-The environment requires Node.js.
-1. Navigate to the following directory: `movie/movie-reservation`.
-2. Install dependencies: `npm install`.
-3. Start the development server: `npm run dev`.
-4. Access URL: `http://localhost:5173`.
+## 3. Installation and Deployment
 
----
+### 3.1. Database Initialization
+1.  Navigate to the `movieReservation.API` directory.
+2.  Execute the command: `docker compose up -d postgres`.
+3.  The database will be accessible on port 5433.
 
-## 2. Pre-configured Administrative Credentials
+### 3.2. Backend Service Deployment
+1.  From the `movieReservation.API` directory, execute: `dotnet run`.
+2.  The service will initialize at `http://localhost:5176`.
+3.  Interactive API documentation is available via Swagger at `http://localhost:5176/swagger`.
 
-The system includes seeded accounts for development and testing purposes:
+### 3.3. Frontend Application Deployment
+1.  Navigate to the `movie-reservation` directory.
+2.  Perform a clean installation of dependencies: `npm install`.
+3.  Launch the development server: `npm run dev`.
+4.  Access the user interface at the local host URI provided by the terminal (typically `http://localhost:3000` or `5173`).
 
-| Role | Email | Password | Primary Responsibilities |
-| :--- | :--- | :--- | :--- |
-| Admin | admin@example.com | admin123 | Management of films, theaters, and email services. |
-| Manager | manager@example.com | manager123 | Management of theaters and screening schedules. |
-| Customer | user@example.com | password123 | Ticket reservations and booking history access. |
+## 4. Authentication and Access Control
 
----
+The platform utilizes role-based access control. The following credentials are provided for initial system verification:
 
-## 3. SMTP Email Configuration
+### 4.1. System Administrator
+-   **Email**: admin@example.com
+-   **Password**: admin123
+-   **Privileges**: Full access to global settings, staff management, cinema configurations, and film registries.
 
-Administrative users must configure SMTP settings to enable automated welcome messages and ticket confirmations:
-1. Authenticate with an Admin account.
-2. Navigate to Settings > Email Configuration.
-3. Input the following parameters:
-    - SMTP Host: `smtp.gmail.com`
-    - Port: `587`
-    - Username: Authorized Gmail address.
-    - Password: 16-character Google App Password.
-    - From Email/Name: Designated sender identity.
-4. Set the Status toggle to Enabled.
-5. Select Save All Settings.
+### 4.2. Cinema Manager
+-   **Email**: manager@example.com
+-   **Password**: manager123
+-   **Privileges**: Management of local cinema layouts and screening schedules.
 
----
+### 4.3. Standard Customer
+-   **Email**: user@example.com
+-   **Password**: password123
+-   **Privileges**: Film browsing, ticket reservations, and personal profile management.
 
-## 4. Dynamic Email Template Management
+## 5. Operational Procedures for Customers
 
-The system supports real-time modification of email content via the administrative interface without requiring source code changes.
+### 5.1. Film Discovery
+Users may browse the homepage or the dedicated Movies section to view current and upcoming screenings. Selecting a film allows access to detailed descriptions, cast information, and trailers.
 
-### 4.1. Placeholders (Dynamic Variables)
-The following variables are supported within the templates for automated data injection:
-- `{{name}}`: Recipient name.
-- `{{movieTitle}}`: Reserved film title.
-- `{{seats}}`: Seat designations (e.g., A1, A2).
-- `{{totalPrice}}`: Aggregate reservation cost.
-- `{{bookingId}}`: Unique reservation identifier (utilized for QR Code generation).
+### 5.2. Ticket Reservation
+1.  Select the desired film and screening time.
+2.  Navigate to the interactive seat map to reserve specific positions.
+3.  Confirm the selection and finalize the booking.
+4.  Digital tickets are accessible via the My Tickets section.
 
-### 4.2. Modification Procedure
-1. Extract the HTML content from the `email_templates.md` file.
-2. Insert the code into the Welcome Email or Booking Email editor.
-3. Commit changes by selecting Save.
+## 6. Administrative Protocols
 
----
+### 6.1. Personnel Oversight
+Administrators may onboard new staff members, assign roles (Manager or Staff), and audit system activity records to ensure operational integrity.
 
-## 5. Troubleshooting and Maintenance
+## 7. Troubleshooting and Technical Support
 
-### 5.1. Error: "Fail to save settings"
-- Root Cause: Potential schema mismatch between the current database and new configuration columns (e.g., WelcomeEmailSubject).
-- Resolution: The system utilizes a self-healing mechanism in `Program.cs`. Restarting the API service will trigger an automatic database migration to resolve schema discrepancies.
+### 7.1. Database Migration Discrepancies
+If the system fails to persist configuration changes, verify that the database schema is current. The backend includes automated migration logic; restarting the `dotnet run` service will typically resolve these issues.
 
-### 5.2. Issue: Email Delivery Failure
-- Verify the accuracy of the Google App Password.
-- Ensure the Enabled status is active in the Email Configuration settings.
-- Inspect the recipient's spam folder.
-
-### 5.3. Error: CORS (Cross-Origin Resource Sharing)
-- If the Frontend port is modified (e.g., to port 3001), the new origin must be explicitly added to the `WithOrigins` list within the Backend `Program.cs` file.
+### 7.2. Port Conflicts and CORS Policy
+If the frontend is moved to a non-standard port, ensure that the backend `Program.cs` file is updated to include the new origin in the Cross-Origin Resource Sharing (CORS) whitelist.
 
 ---
 End of Document
